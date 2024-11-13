@@ -1,3 +1,5 @@
+#ifndef STORAGESERVER_H
+#define STORAGESERVER_H
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,3 +9,5 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <pthread.h>
+#endif

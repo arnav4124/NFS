@@ -1,7 +1,11 @@
 #include "./storageserver.h"
-#define PORT 8082
-
-int connect_to_ns(char *ns_ip, int ns_port) {
+// #include "./requests.h"
+#include "./commonheaders.h"
+#include "namingserver.h"
+#include <errno.h>
+#define PORT 8083
+// int sockfd;
+int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
     int sockfd;
     struct sockaddr_in serv_addr;
     struct hostent *server;
@@ -30,40 +34,66 @@ int connect_to_ns(char *ns_ip, int ns_port) {
     // Connect to the server
     if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         perror("ERROR connecting");
+        int errsv = errno;
+        printf("errno: %d\n", errsv);
         close(sockfd);
         return -1;
     }
+    StorageServer ss;
+    ss.ssSocket = sockfd;
+    ss.root = NULL;
+    pthread_mutex_init(&ss.writeLock, NULL);
+    // ss.ssIP = (char*)malloc(strlen(argv) + 1);
+    strcpy(ss.ssIP, argv );
+    ss.ssPort = PORT;
+    char buffer[sizeof(StorageServer)];
+    memset(buffer, 0, sizeof(buffer));
+    memcpy(buffer, &ss, sizeof(StorageServer));
+    // printf all the information
+    printf("IP: %s\n", ss.ssIP);
+    printf("Port: %d\n", ss.ssPort);
+    printf("Socket: %d\n", ss.ssSocket);
+    printf("Root: %p\n", ss.root);
+    // printf("Write Lock: %p\n", ss.writeLock);
+    request req;
+    memset(&req, 0, sizeof(request));
+    req.requestType = INITSS;
+    memcpy(req.data, buffer, sizeof(buffer));
+    char packet[sizeof(request)];
+    memset(packet, 0, sizeof(packet));
+    memcpy(packet, &req, sizeof(request));
 
-    // Send IP, port, and identifier information to the Name Server
-    const char *server_info = "127.0.0.1 8082";
-    if (send(sockfd, server_info, strlen(server_info), 0) < 0) {
-        perror("ERROR sending server information");
+    printf("packet: %s\n", packet);
+    int ch=send(sockfd, packet, sizeof(packet), 0);
+    if(ch<0){
+        perror("Failed to send storage server information");
         close(sockfd);
         return 1;
     }
+    // Send IP, port, and identifier information to the Name Server
+   
+    // char buffer[1024];
+    // recv(sockfd, buffer, sizeof(buffer), 0);
 
-    char buffer[1024];
-    recv(sockfd, buffer, sizeof(buffer), 0);
+    // // Open the accessible paths file
+    // FILE *fp = fopen("./accessiblepaths.txt", "r");
+    // if (fp == NULL) {
+    //     perror("Error opening file");
+    //     close(sockfd);
+    //     return -1;
+    // }
 
-    // Open the accessible paths file
-    FILE *fp = fopen("./accessiblepaths.txt", "r");
-    if (fp == NULL) {
-        perror("Error opening file");
-        close(sockfd);
-        return -1;
-    }
-
-    // Read and send the contents of accessiblepaths.txt to the server
-    memset(buffer, 0, sizeof(buffer));
-    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
-        if (send(sockfd, buffer, strlen(buffer), 0) < 0) {
-            perror("ERROR sending data");
-            fclose(fp);
-            close(sockfd);
-            return -1;
-        }
-    }
-    fclose(fp);
+    // // Read and send the contents of accessiblepaths.txt to the server
+    // memset(buffer, 0, sizeof(buffer));
+    // while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+    //     if (send(sockfd, buffer, strlen(buffer), 0) < 0) {
+    //         perror("ERROR sending data");
+    //         fclose(fp);
+    //         close(sockfd);
+    //         return -1;
+    //     }
+    // }
+    // fclose(fp);
 
     return sockfd;
 }
@@ -76,13 +106,13 @@ int main(int argc, char *argv[]) {
     }
 
     // Connect to the Name Server
-    int ns_socket = connect_to_ns(argv[1], PORT);
+    int ns_socket = connect_to_ns(argv[1],NAME_SERVER_PORT ,argv[1]);
     if (ns_socket == -1) {
         printf("Connection to Name Server failed\n");
         return 1;
     }
     printf("Connection to Name Server successful\n");
-
+    
     // Close the socket after the communication is done
     close(ns_socket);
     return 0;

@@ -1,37 +1,41 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <bits/pthreadtypes.h>
-#include <arpa/inet.h>
 
-#include "./commonheaders.h"
-#include "./requests.h"
-#include "./trie.h"
+    #ifndef NAMINGSERVER_H
+    #define NAMINGSERVER_H
+    #include <stdlib.h>
+    #include <stdio.h>
+    #include <string.h>
+    #include <unistd.h>
+    #include <sys/types.h>
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <bits/pthreadtypes.h>
+    #include <arpa/inet.h>
+    #include <pthread.h>
 
-#define MAX_SERVERS 10
-#define MAX_PATHS 1024
+    // #include "./requests.h"
+    // #include "./trie.h"
 
-#define SERVER_PORT 8082
+    #define MAX_SERVERS 10
+    #define MAX_PATHS 1024
 
-#define MAX_CLIENTS 10
+    #define SERVER_PORT 8082
 
-int clientSockets[MAX_CLIENTS];
+    #define MAX_CLIENTS 10
 
-typedef struct {
-    char* ssIP;
-    int ssPort;
-    int ssSocket;
-    struct trie_node* root;
-    pthread_mutex_t writeLock;
-} StorageServer;
+   extern int clientSockets[MAX_CLIENTS];
 
-int currentServerCount = 0;
-StorageServer* storageServersList[MAX_SERVERS];
+    typedef struct {
+        char ssIP[20];
+        int ssPort;
+        int ssSocket;
+        struct trie_node* root;
+        pthread_mutex_t writeLock;
+    } StorageServer;
 
-int sockfd;
+  extern   int currentServerCount ;
+    extern StorageServer* storageServersList[MAX_SERVERS];
 
-int serverPorts = 8100;
+    extern int sockfd;
+
+   extern int serverPorts ;
+    #endif

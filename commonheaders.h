@@ -1,3 +1,6 @@
+#ifndef COMMONHEADERS_H
+#define COMMONHEADERS_H
+#define NAME_SERVER_PORT 8082
 typedef enum {
    READ,
    WRITE,
@@ -28,4 +31,4 @@ typedef struct{
     char data[MAX_DATA_LENGTH];
 } request;
 
-
+#endif
