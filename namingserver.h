@@ -29,6 +29,7 @@
         int ssPort;
         int ssSocket;
         struct trie_node* root;
+        int clientPort;
         pthread_mutex_t writeLock;
     } StorageServer;
 

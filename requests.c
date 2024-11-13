@@ -55,6 +55,7 @@ void connectToSS(StorageServer ss){
     
     storageServersList[currentServerCount]->ssPort = ss.ssPort;
     storageServersList[currentServerCount]->ssSocket = ssSocket;
+    storageServersList[currentServerCount]->clientPort = ss.clientPort;
     printf("Connected to storage server %s:%d\n", ss.ssIP, ss.ssPort);
     // storageServersList[currentServerCount]->ssPort = serverPorts;
     storageServersList[currentServerCount]->root = ss.root;

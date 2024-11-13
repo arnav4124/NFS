@@ -4,6 +4,7 @@
 #include "namingserver.h"
 #include <errno.h>
 #define PORT 8083
+#define CLIENT_PORT 8084
 // int sockfd;
 int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
     int sockfd;
@@ -46,6 +47,7 @@ int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
     // ss.ssIP = (char*)malloc(strlen(argv) + 1);
     strcpy(ss.ssIP, argv );
     ss.ssPort = PORT;
+    ss.clientPort = CLIENT_PORT;
     char buffer[sizeof(StorageServer)];
     memset(buffer, 0, sizeof(buffer));
     memcpy(buffer, &ss, sizeof(StorageServer));
