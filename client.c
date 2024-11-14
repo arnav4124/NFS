@@ -292,23 +292,57 @@ int main(int argc, char* argv[]) {
             // close(sockfd);
         }        
         else if (req.requestType == STREAM) {
+            // int count = 0;
+            // FILE *audio_player = popen("ffplay -autoexit -nodisp -", "w");
+            // if (audio_player == NULL) {
+            //     perror("Error opening audio player");
+            //     close(sockfd);
+            //     exit(EXIT_FAILURE);
+            // }
+            // request packet;
+            
+            // ssize_t bytes_received;
+            // bytes_received = recv(ss_sockfd, &packet, sizeof(request), 0);
+            // while ( bytes_received> 0) {
+            //     printf("requestType: %d\n", packet.requestType);
+            //     if (packet.requestType == STREAM) {
+            //         fwrite(packet.data, 1, bytes_received - sizeof(int), audio_player);
+            //         fflush(audio_player);
+            //         count++;
+            //     }
+            //     // request packet;
+            //     memset(&packet, 0, sizeof(request));
+            //     bytes_received = recv(ss_sockfd, &packet, sizeof(request), 0);
+            // }
+            // if (bytes_received < 0) perror("Error receiving audio data");
+            // else printf("Audio stream ended\n");
+            // printf("count: %d\n", count);
+            // pclose(audio_player);
+            // close(ss_sockfd);
+
+
+            char buffer[MAX_STRUCT_LENGTH];
             FILE *audio_player = popen("ffplay -autoexit -nodisp -", "w");
             if (audio_player == NULL) {
                 perror("Error opening audio player");
                 close(sockfd);
                 exit(EXIT_FAILURE);
             }
-            request packet;
-            ssize_t bytes_received;
-            while ((bytes_received = recv(ss_sockfd, &packet, sizeof(request), 0)) > 0) {
-                if (packet.requestType == STREAM) {
-                    fwrite(packet.data, 1, bytes_received - sizeof(int), audio_player);
-                    fflush(audio_player);
-                }
-            }
-            if (bytes_received < 0) perror("Error receiving audio data");
-            else printf("Audio stream ended\n");
 
+
+            ssize_t bytes_received;
+            while ((bytes_received = recv(ss_sockfd, buffer, MAX_STRUCT_LENGTH, 0)) > 0) {
+                fwrite(buffer, 1, bytes_received, audio_player);
+                fflush(audio_player);
+            }
+
+            if (bytes_received < 0) {
+                perror("Error receiving audio data");
+            } else {
+                printf("Audio stream ended\n");
+            }
+
+            // Clean up
             pclose(audio_player);
             close(ss_sockfd);
 

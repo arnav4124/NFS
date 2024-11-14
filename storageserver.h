@@ -1,5 +1,6 @@
 #ifndef STORAGESERVER_H
 #define STORAGESERVER_H
+#define _BSD_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

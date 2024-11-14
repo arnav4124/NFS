@@ -230,14 +230,10 @@ void handleDelete(processRequestStruct* req){
         return;
     }
 
-    char data[MAX_STRUCT_LENGTH];
-    memset(data, 0, sizeof(data));
-    memcpy(data, &cr, sizeof(client_request));
-
     request reqq;
     memset(&reqq, 0, sizeof(request));
     reqq.requestType = req->requestType;
-    memcpy(reqq.data, data, sizeof(client_request));
+    memcpy(reqq.data, req->data, sizeof(client_request));
 
     char buffer[sizeof(request)];
     memset(buffer, 0, sizeof(buffer));
@@ -330,7 +326,7 @@ void handleDelete(processRequestStruct* req){
         memset(&req2, 0, sizeof(request));
         req2.requestType = ERROR;
 
-        strcpy(req2.data, "Failed to delete file/folder");
+        strcpy(req2.data, res.data);
 
         char buffer[sizeof(request)];
         memset(buffer, 0, sizeof(buffer));
@@ -551,7 +547,7 @@ void handleCreate(processRequestStruct* req){
         request req2;
         memset(&req2, 0, sizeof(request));
         req2.requestType = ERROR;
-        strcpy(req2.data, "Error processing request");
+        strcpy(req2.data, res.data);
 
         char buffer[sizeof(request)];
         memset(buffer, 0, sizeof(buffer));

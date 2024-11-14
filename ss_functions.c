@@ -114,8 +114,9 @@ void * handle_ns_req(void* arg){
         printf("File deleted successfully\n");
         send_ack_to_ns(clientSocket,"File deleted successfully");
     }
+    else if(req.requestType==COP)
     // else if(req.requestType==LIST)
-    // {
+    // {el
     //     // list the folder
     //     printf("Listing folder\n");
     //     printf("Folder name: %s\n", req.data);
@@ -290,20 +291,24 @@ void* handle_client_req(void* arg)
         char data[MAX_STRUCT_LENGTH-2];
         memset(data, 0, MAX_STRUCT_LENGTH);
         size_t nread;
+        int count=0;
         while((nread = fread(data, 1, MAX_STRUCT_LENGTH, file)) > 0){
             request pack;
             pack.requestType = STREAM;
+            printf("TYPE: %d\n", pack.requestType);
             strcpy(pack.data, data);
             char buffer[sizeof(request)];
-            memset(buffer, 0, sizeof(request));
+            // memset(buffer, 0, sizeof(request));
             memcpy(buffer, &pack, sizeof(request));
-            if(send(clientSocket, buffer, sizeof(request), 0) < 0){
+            if(send(clientSocket, data, sizeof(data), 0) < 0){
                 perror("Send failed");
                 close(clientSocket);
                 return NULL;
             }
-            memset(data, 0, MAX_STRUCT_LENGTH);
+            count++;
+            // memset(data, 0, MAX_STRUCT_LENGTH);
         }
+        printf("Count: %d\n", count);
         printf("Audio File sent successfully\n");
         
     } 
