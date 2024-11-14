@@ -2,10 +2,46 @@
 // #include "./requests.h"
 #include "./commonheaders.h"
 #include "namingserver.h"
+#include <pthread.h>
+#include "ss_functions.h"
 #include <errno.h>
+#define QUEUE_SIZE 1024
 #define PORT 8083
 #define CLIENT_PORT 8084
 
+int queue[QUEUE_SIZE];
+int front = 0;
+int rear = -1;
+int itemcount = 0;
+int peek() {
+    return queue[front];
+}
+int isEmpty() {
+    return itemcount == 0;
+}
+int isFull() {
+    return itemcount == 1024;
+}
+int size() {
+    return itemcount;
+}
+void insert(int data) {
+    if (!isFull()) {
+        if (rear == 1024 - 1) {
+            rear = -1;
+        }
+        queue[++rear] = data;
+        itemcount++;
+    }
+}
+int removeData() {
+    int data = queue[front++];
+    if (front == 1024) {
+        front = 0;
+    }
+    itemcount--;
+    return data;
+}
 // int sockfd;
 int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
     int sockfd;
@@ -44,7 +80,7 @@ int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
     StorageServer ss;
     ss.ssSocket = sockfd;
     ss.root = NULL;
-    pthread_mutex_init(&ss.writeLock, NULL);
+    pthread_mutex_init(&ss.mutex, NULL);
     // ss.ssIP = (char*)malloc(strlen(argv) + 1);
     strcpy(ss.ssIP, argv );
     ss.ssPort = PORT;
@@ -122,5 +158,12 @@ int main(int argc, char *argv[]) {
     
     // Close the socket after the communication is done
     close(ns_socket);
+    pthread_t ns_listener;
+    pthread_create(&ns_listener, NULL, NS_listener, argv[1]);
+    pthread_t client_listener;
+    pthread_create(&client_listener, NULL, Client_listner, argv[1]);
+    pthread_join(ns_listener, NULL);
+    pthread_join(client_listener, NULL);
+
     return 0;
 }

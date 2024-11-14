@@ -10,4 +10,17 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <pthread.h>
+#define QUEUE_SIZE 1024
+extern int queue[QUEUE_SIZE];
+extern int front;
+extern int rear;
+extern int itemcount;
+int peek();
+
+int isfull();
+int isempty();
+int size();
+void insert(int data);
+int remove_data();
+int connect_to_ns(char *ns_ip, int ns_port,char* argv);
 #endif

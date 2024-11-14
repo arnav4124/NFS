@@ -1,5 +1,12 @@
 #ifndef REQUESTS_H
 #define REQUESTS_H
+
+
+#include "./commonheaders.h"
+#include "./trie.h"
+#include "./namingserver.h" 
+#include <netdb.h>
+
 void* processRequests(void* args);
 
 // void addAccessiblePaths(char* path, int serverIndex);
