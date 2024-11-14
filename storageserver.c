@@ -5,6 +5,7 @@
 #include <errno.h>
 #define PORT 8083
 #define CLIENT_PORT 8084
+
 // int sockfd;
 int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
     int sockfd;
@@ -72,6 +73,7 @@ int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
         close(sockfd);
         return 1;
     }
+
     // Send IP, port, and identifier information to the Name Server
    
     // char buffer[1024];
@@ -96,7 +98,10 @@ int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
     //     }
     // }
     // fclose(fp);
-
+     if(close(sockfd)<0){
+        perror("Failed to close socket");
+        return -1;
+     }
     return sockfd;
 }
 
