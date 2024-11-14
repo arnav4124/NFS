@@ -31,6 +31,7 @@ typedef struct {
   struct trie_node* root;
   int clientPort;
   int status;
+  int numberOfPaths;
   pthread_mutex_t mutex;
 } StorageServer;
 

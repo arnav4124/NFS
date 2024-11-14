@@ -8,7 +8,7 @@
 #define QUEUE_SIZE 1024
 #define PORT 8083
 #define CLIENT_PORT 8084
-
+int ns_send_socket;
 int queue[QUEUE_SIZE];
 int front = 0;
 int rear = -1;
@@ -77,6 +77,7 @@ int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
         close(sockfd);
         return -1;
     }
+    ns_send_socket = sockfd;
     StorageServer ss;
     ss.ssSocket = sockfd;
     ss.root = NULL;
@@ -146,7 +147,7 @@ int main(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <NameServer_IP>\n", argv[0]);
         return 1;
-    }
+    } 
 
     // Connect to the Name Server
     int ns_socket = connect_to_ns(argv[1],NAME_SERVER_PORT ,argv[1]);
@@ -160,6 +161,7 @@ int main(int argc, char *argv[]) {
     close(ns_socket);
     pthread_t ns_listener;
     pthread_create(&ns_listener, NULL, NS_listener, argv[1]);
+    // sleep(0.1) ;
     pthread_t client_listener;
     pthread_create(&client_listener, NULL, Client_listner, argv[1]);
     pthread_join(ns_listener, NULL);

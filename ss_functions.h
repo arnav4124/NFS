@@ -7,7 +7,11 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <fcntl.h>
 #define PORT 8083
 #define CLIENT_PORT 8084
 #define MAX_CLIENTS 10

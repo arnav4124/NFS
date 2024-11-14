@@ -15,6 +15,7 @@ extern int queue[QUEUE_SIZE];
 extern int front;
 extern int rear;
 extern int itemcount;
+extern int ns_send_socket;
 int peek();
 
 int isfull();

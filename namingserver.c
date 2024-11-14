@@ -28,11 +28,11 @@ if (sockfd == -1) {
 }
 printf("Socket successfully created...\n");
 
-bzero(&servaddr, sizeof(servaddr));
+bzero(&servaddr, sizeof(servaddr)); 
 servaddr.sin_family = AF_INET;
 servaddr.sin_addr.s_addr = INADDR_ANY;
 servaddr.sin_port = htons(SERVER_PORT);
-
+setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
 if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
     perror("Bind failed");
     close(sockfd);
@@ -40,12 +40,12 @@ if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
 }
 printf("Bind to port %d successful...\n", SERVER_PORT);
 
-if (listen(sockfd, MAX_CLIENTS) < 0) {
-    perror("Listen failed");
-    close(sockfd);
-    exit(EXIT_FAILURE);
-}
 while (1) {
+    if (listen(sockfd, MAX_CLIENTS) < 0) {
+        perror("Listen failed");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }   
     int clientSocketID = findFreeClientSocketIndex();
     if (clientSocketID == -1) {
         perror("No free client sockets");
@@ -87,7 +87,6 @@ while (1) {
         close(clientSockets[clientSocketID]);
         clientSockets[clientSocketID] = -1;
     } 
-    // pthread_join(requestHandlerThread, NULL);
 }
 
     close(sockfd);

@@ -24,11 +24,33 @@ int ack_received = 0;
 //     return NULL;
 // }
 
+// char* normalizePath(char* path) {
+//     while (*path == '.' || *path == '/') {
+//         path++;
+//     }
+//     return path;
+// } 
+
 char* normalizePath(char* path) {
+    if (strcmp(path, ".") == 0) {
+        return ".";
+    }
+    // Move pointer forward to skip leading '.' or '/' characters
     while (*path == '.' || *path == '/') {
         path++;
     }
-    return path;
+    
+    // Allocate memory for new path with "./" prefix
+    char* normalizedPath = (char*)malloc(strlen(path) + 3); // 2 for "./" and 1 for '\0'
+    if (!normalizedPath) {
+        return NULL; // Handle allocation failure
+    }
+    
+    // Add "./" prefix to normalized path
+    strcpy(normalizedPath, "./");
+    strcat(normalizedPath, path);
+
+    return normalizedPath;
 }
 
 requestType getRequestType(const char* operation) {
@@ -38,7 +60,7 @@ requestType getRequestType(const char* operation) {
     // if (strcmp(operation, "APPEND") == 0) return APPEND;
     if (strcmp(operation, "CREATEFILE") == 0) return CREATEFILE; 
     if (strcmp(operation, "CREATEFOLDER") == 0) return CREATEFOLDER;
-    if (strcmp(operation, "DELETE") == 0) return DELETEFILE; 
+    if (strcmp(operation, "DELETEFILE") == 0) return DELETEFILE; 
     if (strcmp(operation, "DELETEFOLDER") == 0) return DELETEFOLDER;
     if (strcmp(operation, "COPY") == 0) return COPY;
     if (strcmp(operation, "LIST") == 0) return LIST;
@@ -68,6 +90,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
         input[strcspn(input, "\n")] = '\0';
+        // printf("Input: %s\n", input);
         arg1[0] = '\0';
         arg2[0] = '\0';
         char* token = strtok(input, " ");
@@ -99,7 +122,7 @@ int main(int argc, char* argv[]) {
             }
             else req.requestType = WRITEASYNC;
         }
-        else if (strcmp(operation, "COPY") == 0 || strcmp(operation, "CREATE") == 0) {
+        else if (strcmp(operation, "COPY") == 0 || strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "CREATEFILE") == 0) {
             token = strtok(NULL, " ");
             if (token != NULL) {
                 strncpy(arg2, token, MAX_PATH_LENGTH);
@@ -110,13 +133,14 @@ int main(int argc, char* argv[]) {
             printf("Error: Invalid format, missing primary argument.\n");
             continue;
         }
-        if ((strcmp(operation, "CREATE") == 0 || strcmp(operation, "COPY") == 0) && !arg2[0]) {
+        if ((strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "CREATEFILE") == 0 || strcmp(operation, "COPY") == 0) && !arg2[0]) {
             printf("Error: Missing second argument for %s operation.\n", operation);
             continue;
         }
         if (arg1[0] && arg2[0]) snprintf(req.data, MAX_STRUCT_LENGTH, "%s %s", arg1, arg2);
         else if (arg1[0]) snprintf(req.data, MAX_STRUCT_LENGTH, "%s", arg1);
         else req.data[0] = '\0';
+        printf("arg1: %s, arg2: %s\n", arg1, arg2);
         printf("1RequestType: %d, Data: %s\n", req.requestType, req.data);
 
 
@@ -143,12 +167,6 @@ int main(int argc, char* argv[]) {
         }
         char response[MAX_DATA_LENGTH];
         
-        // if (recv(sockfd, response, sizeof(response), 0) < 0) {
-        //     perror("Error receiving response from naming server");
-        //     close(sockfd);
-        //     exit(1);
-        // }
-        // close(sockfd);
         request ns_response;
         if (recv(sockfd, &ns_response, sizeof(ns_response), 0) < 0) {
             perror("Error receiving response from naming server");
@@ -193,11 +211,18 @@ int main(int argc, char* argv[]) {
             continue;
         }
         printf("Storage Server IP: %s, Port: %s\n", storage_server_ip, storage_server_port);
+        fflush(stdout);
 
         
 
 
+        printf("operation: %s\n", operation);
+        if (strcmp(operation, "CREATEFILE") == 0 || strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "DELETEFILE") == 0 || strcmp(operation, "DELETEFOLDER") == 0 || strcmp(operation, "COPY") == 0) {
+            continue;
+        }
 
+        printf("RequestType: %d, Data: %s\n", req.requestType, req.data);
+        printf("Connecting to storage server...\n");    
 
         int ss_sockfd = socket(AF_INET, SOCK_STREAM, 0);
         if (ss_sockfd < 0) {
@@ -218,6 +243,7 @@ int main(int argc, char* argv[]) {
             close(ss_sockfd);
             exit(1);
         }
+        printf("Request sent to storage server.\n");
 
 
         // if (req.requestType == WRITESYNC) {
@@ -253,7 +279,8 @@ int main(int argc, char* argv[]) {
         //         printf("Error: Did not receive expected ACK from storage server.\n");
         //     }
         // }
-        // else {
+        // else 
+        if (req.requestType == READ || req.requestType == LIST || req.requestType == INFO) {
             request ss_response;
             if (recv(ss_sockfd, &ss_response, sizeof(ss_response), 0) < 0) {
                 perror("Error receiving response from storage server");
@@ -262,10 +289,64 @@ int main(int argc, char* argv[]) {
             }
             close(ss_sockfd);
             printf("Storage Server Response - RequestType: %d, Data: %s\n", ss_response.requestType, ss_response.data);
-        //     close(sockfd);
-        // }        
+            // close(sockfd);
+        }        
+        else if (req.requestType == STREAM) {
+            FILE *audio_player = popen("ffplay -autoexit -nodisp -", "w");
+            if (audio_player == NULL) {
+                perror("Error opening audio player");
+                close(sockfd);
+                exit(EXIT_FAILURE);
+            }
+            request packet;
+            ssize_t bytes_received;
+            while ((bytes_received = recv(ss_sockfd, &packet, sizeof(request), 0)) > 0) {
+                if (packet.requestType == STREAM) {
+                    fwrite(packet.data, 1, bytes_received - sizeof(int), audio_player);
+                    fflush(audio_player);
+                }
+            }
+            if (bytes_received < 0) perror("Error receiving audio data");
+            else printf("Audio stream ended\n");
 
+            pclose(audio_player);
+            close(ss_sockfd);
+
+
+
+            // char temp_filename[] = "audio.wav";
+            // FILE *audio_file = fopen(temp_filename, "wb");
+            // if (audio_file == NULL) {
+            //     perror("Error opening temporary file for audio data");
+            //     close(sockfd);
+            //     exit(EXIT_FAILURE);
+            // }
+            // // Start the player as a separate process
+            // pid_t pid = fork();
+            // if (pid == 0) {
+            //     // Child process to play the audio
+            //     execlp("ffplay", "ffplay", "-autoexit", "-nodisp", temp_filename, NULL);
+            //     perror("Error launching ffplay");
+            //     exit(EXIT_FAILURE);
+            // }
+            // // Receive and write audio data
+            // request packet;
+            // ssize_t bytes_received;
+            // while ((bytes_received = recv(sockfd, &packet, sizeof(request), 0)) > 0) {
+            //     if (packet.requestType == STREAM) {
+            //         fwrite(packet.data, 1, bytes_received - sizeof(requestType), audio_file);
+            //         fflush(audio_file);  // Ensure data is written to file immediately
+            //     }
+            // }
+            // if (bytes_received < 0) perror("Error receiving audio data");
+            // else printf("Audio stream ended\n");
+            // fclose(audio_file);
+            // close(sockfd);
+            // // Wait for the audio player process to complete
+            // wait(NULL);
+            // // Remove the temporary file
+            // remove(temp_filename);
+        }
     }
-
     return 0;
 }

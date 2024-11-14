@@ -17,7 +17,7 @@ typedef enum {
    STREAM,
    INITSS,
    ACK,
-   ERROR
+   ERROR,
 } requestType;
 
 typedef enum{
@@ -35,6 +35,7 @@ typedef enum{
 #define MAX_NAME_LENGTH 1024
 #define MAX_DATA_LENGTH 4096
 #define MAX_STRUCT_LENGTH 5000
+#define STREAM_BUFFER_SIZE 1000000
 
 typedef struct {
     requestType requestType;

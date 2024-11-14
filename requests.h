@@ -5,6 +5,11 @@
 #include "./commonheaders.h"
 #include "./trie.h"
 #include "./namingserver.h" 
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <strings.h>
 #include <netdb.h>
 
 void* processRequests(void* args);

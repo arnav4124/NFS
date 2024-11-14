@@ -25,6 +25,7 @@ struct trie_node *create_trie_node()
 int insert_path(struct trie_node *root, char *key,int ssid)
 {
     // Starting from the root node
+    printf("Inserting %s\n",key);
     struct trie_node *current = root;
     for (int i = 0; key[i] != '\0'; i++)
     {
