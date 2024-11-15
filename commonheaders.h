@@ -11,13 +11,16 @@ typedef enum {
    CREATEFOLDER,
    DELETEFILE,
    DELETEFOLDER,
-   COPY,    
+   COPYFILE,
+   COPYFOLDER,    
    LIST,
    INFO,
    STREAM,
+   LRU,
    INITSS,
    ACK,
    ERROR,
+   ASYNC_ACK,
 } requestType;
 
 typedef enum{

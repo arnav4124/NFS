@@ -42,3 +42,4 @@ linked_list_node create_linked_list_node(char* path);
 void insert_in_linked_list(linked_list_head linked_list, char* path);
 void add_paths(linked_list_head ll, struct trie_node *root);
 void free_linked_list(linked_list_head linked_list);
+void copy_paths(struct trie_node *root, char* buffer);

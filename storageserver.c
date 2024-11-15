@@ -79,20 +79,19 @@ int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
     }
     ns_send_socket = sockfd;
     StorageServer ss;
-    ss.ssSocket = sockfd;
     ss.root = NULL;
     pthread_mutex_init(&ss.mutex, NULL);
     // ss.ssIP = (char*)malloc(strlen(argv) + 1);
     strcpy(ss.ssIP, argv );
     ss.ssPort = PORT;
     ss.clientPort = CLIENT_PORT;
+    printf("client port: %d\n", ss.clientPort);
     char buffer[sizeof(StorageServer)];
     memset(buffer, 0, sizeof(buffer));
     memcpy(buffer, &ss, sizeof(StorageServer));
     // printf all the information
     printf("IP: %s\n", ss.ssIP);
     printf("Port: %d\n", ss.ssPort);
-    printf("Socket: %d\n", ss.ssSocket);
     printf("Root: %p\n", ss.root);
     // printf("Write Lock: %p\n", ss.writeLock);
     request req;
@@ -110,7 +109,26 @@ int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
         close(sockfd);
         return 1;
     }
-
+    // send the accessible paths to the naming server
+    FILE *fp = fopen("./accessible_paths.txt", "r");
+    if (fp == NULL) {
+        perror("Error opening file");
+        close(sockfd);
+        return -1;
+    }
+    char buffer1[1024];
+    memset(buffer1, 0, sizeof(buffer1));
+    while (fgets(buffer1, sizeof(buffer1), fp) != NULL) {
+        printf("buffer1: %s\n", buffer1);
+        buffer1[strlen(buffer1) - 1] = '\0';
+        if (send(sockfd, buffer1, sizeof(buffer1), 0) < 0) {
+            perror("ERROR sending data");
+            fclose(fp);
+            close(sockfd);
+            return -1;
+        }
+        memset(buffer1, 0, sizeof(buffer1));
+    }
     // Send IP, port, and identifier information to the Name Server
    
     // char buffer[1024];
@@ -144,11 +162,17 @@ int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
 
 int main(int argc, char *argv[]) {
     // Verify command-line arguments
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <NameServer_IP>\n", argv[0]);
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <NameServer_IP> <name of ss>\n", argv[0]);
         return 1;
     } 
-
+    //change the current working directory to the directory where the storage server is running
+    if(chdir(argv[2])<0){
+        perror("Failed to change directory");
+        return 1;
+    }
+    printf("Current working directory: %s\n", getcwd(NULL, 0));
+    // return 1;
     // Connect to the Name Server
     int ns_socket = connect_to_ns(argv[1],NAME_SERVER_PORT ,argv[1]);
     if (ns_socket == -1) {

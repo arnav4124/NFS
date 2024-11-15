@@ -1,6 +1,23 @@
 
 #include "./namingserver.h"
 
+void sendMessageToClient(int clientSocket, requestType type, char* data){
+    request req;
+    memset(&req, 0, sizeof(request));
+    req.requestType = type;
+    strcpy(req.data, data);
+
+    char buffer[sizeof(request)];
+    memset(buffer, 0, sizeof(buffer));
+    memcpy(buffer, &req, sizeof(request));
+
+    int ch = send(clientSocket, buffer, sizeof(request), 0);
+    if(ch < 0){
+        printf("Failed to send response to client");
+    }
+    return;
+}
+
 // Send data to a port
 int connectTo(int port, char* ip){
     int sockfd;
@@ -39,74 +56,56 @@ int connectTo(int port, char* ip){
     return sockfd;
 }
 
-void connectToSS(StorageServer ss){
+void connectToSS(StorageServer ss, int ssSocket){
     // connect to the storage server
-    printf("Connecting to storage server %s:%d\n", ss.ssIP, ss.ssPort);
-    int ssSocket;
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(ss.ssPort);
-    serv_addr.sin_addr.s_addr = inet_addr(ss.ssIP);
+    serv_addr.sin_addr.s_addr = inet_addr(ss.ssIP);    
 
-    ssSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (ssSocket < 0) {
-        perror("Failed to create socket");
-        exit(EXIT_FAILURE);
-    }
+    for(int i = 0 ; i < MAX_SERVERS ; i++){
+        if(storageServersList[i]->status == -1){
+            strcpy(storageServersList[i]->ssIP, ss.ssIP);
+            storageServersList[i]->ssPort = ss.ssPort;
+            storageServersList[i]->clientPort = ss.clientPort;
+            storageServersList[i]->root = create_trie_node();
+            storageServersList[i]->numberOfPaths = 2;
+            storageServersList[i]->status = 1;
+            currentServerCount++;
 
-    if (connect(ssSocket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-        perror("Failed to connect to storage server");
-        close(ssSocket);
-        // exit(EXIT_FAILURE);
-    }
-
-    storageServersList[currentServerCount] = malloc(sizeof(StorageServer));
-    // storageServersList[currentServerCount]->ssIP = malloc(strlen(ss.ssIP) + 1);
-    strcpy(storageServersList[currentServerCount]->ssIP, ss.ssIP);
-    
-    storageServersList[currentServerCount]->ssPort = ss.ssPort;
-    storageServersList[currentServerCount]->ssSocket = ssSocket;
-    storageServersList[currentServerCount]->clientPort = ss.clientPort;
-    printf("Connected to storage server %s:%d\n", ss.ssIP, ss.ssPort);
-    storageServersList[currentServerCount]->root = create_trie_node();
-    insert_path(storageServersList[currentServerCount]->root, "./ar.txt", currentServerCount);
-    insert_path(storageServersList[currentServerCount]->root, ".", currentServerCount);
-    insert_path(storageServersList[currentServerCount]->root, "./audio.wav", currentServerCount);
-    storageServersList[currentServerCount]->numberOfPaths = 2;
-    pthread_mutex_init(&storageServersList[currentServerCount]->mutex, NULL);
-    storageServersList[currentServerCount]->status = 1;
-    currentServerCount++;
-
-    // send(ssSocket, "ACK", 3, 0);
-
-    // char buffer[1024];
-
-    // // Read accessible paths from the client
-    // // int bytes_received = recv(ssSocket, buffer, sizeof(buffer) - 1, 0);
-    // // if (bytes_received <= 0) {
-    // //     perror("Failed to receive accessible paths");
-    // //     close(ssSocket);
-    // //     close(sockfd);
-    // //     exit(EXIT_FAILURE);
-    // // }
-    // buffer[bytes_received] = '\0'; // Null-terminate the received string
-
-    // // Parse and store accessible paths
-    // char *token = strtok(buffer, ",");
-    // while (token != NULL) {
-    //     // addAccessiblePaths(token, currentServerCount - 1);
-    //     token = strtok(NULL, ",");
-    // }
+            //take the list of accessible paths from the storage server
+            int bytes_received = 0;
+            printf("Waiting for paths from storage server\n");
+            while(1){
+                char buffer[MAX_STRUCT_LENGTH];
+                memset(buffer, 0, sizeof(buffer));
+                bytes_received = recv(ssSocket, buffer, sizeof(buffer), 0);
+                if(bytes_received <= 0){
+                    break;
+                }
+                char* token = strtok(buffer, " ");
+                while(token != NULL){
+                    insert_path(storageServersList[i]->root, token, i);
+                    storageServersList[i]->numberOfPaths++;
+                    token = strtok(NULL, " ");
+                }
+            }
+            printf("Received paths from storage server\n");
+            break;
+        }
+    }    
 
     close(ssSocket);   
     return;
 }
 
 void handleWrite(processRequestStruct* req){
+    // char command[MAX_STRUCT_LENGTH];
     client_request cr;
     memset(&cr, 0, sizeof(client_request));
     //req->data has path
     strcpy(cr.path, req->data);
+    printf("Path: %s\n", cr.path);  
 
     //find storage server with the path
     int checkPathIfPresent = 0;
@@ -123,43 +122,16 @@ void handleWrite(processRequestStruct* req){
     }
     if(checkPathIfPresent == 0){
         printf("Path not found\n");
-        //sending this to client
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ERROR;
-
-        strcpy(req2.data, "Path not found");
-
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-
-        if(ch < 0){
-            printf("Failed to send response to client");
-        }
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "Path not found");
         return;
     }   
 
     //send ip and port of ss to client for them to directly connect
-    request req2;
-    memset(&req2, 0, sizeof(request));
-    req2.requestType = ACK;
     char data[MAX_STRUCT_LENGTH];
+    memset(data, 0, sizeof(data));
     snprintf(data, MAX_STRUCT_LENGTH, "%s %d", ss->ssIP, ss->clientPort);
-    strcpy(req2.data, data);
-    printf("%s %d", req2.data, req2.requestType);
-
-    char buffer3[sizeof(request)];
-    memset(buffer3, 0, sizeof(buffer3));
-    memcpy(buffer3, &req2, sizeof(request));
-
-    int ch2 = send(clientSockets[req->clientID], buffer3, sizeof(request), 0);
-    if(ch2 < 0){
-        printf("Failed to send response to client");
-    }
-
+    printf("Data: %s\n", data);
+    sendMessageToClient(clientSockets[req->clientID], ACK, data);
     return;
 }
 
@@ -185,22 +157,7 @@ void handleDelete(processRequestStruct* req){
     }
     if(checkPathIfPresent == 0){
         printf("Path not found\n");
-        //sending this to client
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ERROR;
-
-        strcpy(req2.data, "Path not found");
-
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-
-        if(ch < 0){
-            printf("Failed to send response to client");
-        }
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "Path not found");
         return;
     }   
 
@@ -211,21 +168,8 @@ void handleDelete(processRequestStruct* req){
         ss->status = 0;
 
         //sending this to client
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ERROR;
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "Failed to connect to storage server");
 
-        strcpy(req2.data, "Failed to connect to storage server");
-
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-
-        if(ch < 0){
-            printf("Failed to send response to client");
-        }
         close(sockfd);
         return;
     }
@@ -246,20 +190,8 @@ void handleDelete(processRequestStruct* req){
         ss->status = 0;
 
         //sending this to client
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ERROR;
-        strcpy(req2.data, "Failed to send request to storage server");
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "Failed to send request to storage server");
 
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-
-        if(ch < 0){
-            printf("Failed to send response to client");
-        }
         close(sockfd);
         return;
     }
@@ -273,21 +205,8 @@ void handleDelete(processRequestStruct* req){
         ss->status = 0;
 
         //sending this to client
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ERROR;
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "Failed to receive response from storage server");
 
-        strcpy(req2.data, "Failed to receive response from storage server");
-
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-
-        if(ch < 0){
-            printf("Failed to send response to client");
-        }
         close(sockfd);
         return;
     }
@@ -303,43 +222,33 @@ void handleDelete(processRequestStruct* req){
         delete_path(ss->root, cr.path);
         ss->numberOfPaths--;
         pthread_mutex_unlock(&ss->mutex);
-
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ACK;
-        strcpy(req2.data, "File/Folder deleted successfully");
-
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-
-        if(ch < 0){
-            printf("Failed to send response to client");
-        }
+        
+        sendMessageToClient(clientSockets[req->clientID], ACK, "File/Folder deleted successfully");
     }
     else{
-        printf("Failed to delete file/folder\n");
+        printf("Error : %s\n", res.data);
         //sending this to client
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ERROR;
 
-        strcpy(req2.data, res.data);
-
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-
-        if(ch < 0){
-            printf("Failed to send response to client");
-        }
+        sendMessageToClient(clientSockets[req->clientID], ERROR, res.data);
     }
 
     close(sockfd);
+    return;
+}
+
+void listAllPaths(processRequestStruct* req){
+    char data[MAX_STRUCT_LENGTH];
+    memset(data, 0, sizeof(data));
+    for(int i = 0; i < currentServerCount && storageServersList[i]->status == 1; i++){
+        pthread_mutex_lock(&storageServersList[i]->mutex);
+        char paths[MAX_STRUCT_LENGTH];
+        memset(paths, 0, sizeof(paths));
+        copy_paths(storageServersList[i]->root, paths);
+        strcat(data, paths);
+        strcat(data, "\n");
+        pthread_mutex_unlock(&storageServersList[i]->mutex);
+    }
+    sendMessageToClient(clientSockets[req->clientID], ACK, data);
     return;
 }
 
@@ -356,43 +265,37 @@ void handleCreate(processRequestStruct* req){
     //find storage server with least number of paths
     int checkPathIfPresent = 0;
     StorageServer* ss;
-    int min = 100000000;
     for(int i = 0; i < currentServerCount; i++){
         pthread_mutex_lock(&storageServersList[i]->mutex);  
-        if(storageServersList[i]->numberOfPaths < min){
-            min = storageServersList[i]->numberOfPaths;
-            ss = storageServersList[i];
+        if(search_path(storageServersList[i]->root, cr.path) >= 0){
             checkPathIfPresent = 1;
+            ss = storageServersList[i];
+            pthread_mutex_unlock(&storageServersList[i]->mutex);
+            break;
         }
         pthread_mutex_unlock(&storageServersList[i]->mutex);
     }
 
     if(checkPathIfPresent == 0){
         printf("Path not found\n");
+
+        //sending this to client
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "Path not found");
         return;
     }
 
-        // check if the file/folder already exists
-        if(search_path(ss->root, cr.name) >= 0){
-            printf("File/Folder already exists\n");
-            //sending this to client
-            request req2;
-            memset(&req2, 0, sizeof(request));
-            req2.requestType = ERROR;
+    // check if the file/folder already exists
+    char checkIfExists[MAX_PATH_LENGTH];
+    memset(checkIfExists, 0, sizeof(checkIfExists));
+    sprintf(checkIfExists, "%s/%s", cr.path, cr.name);
+    if(search_path(ss->root, checkIfExists) >= 0){
+        printf("File/Folder already exists\n");
 
-            strcpy(req2.data, "File/Folder already exists");
+        //sending this to client
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "File/Folder already exists");
 
-            char buffer[sizeof(request)];
-            memset(buffer, 0, sizeof(buffer));
-            memcpy(buffer, &req2, sizeof(request));
-
-            int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-
-            if(ch < 0){
-                printf("Failed to send response to client");
-            }
-            return;
-        }
+        return;
+    }
 
     int sockfd = connectTo(ss->ssPort, ss->ssIP);
 
@@ -401,21 +304,8 @@ void handleCreate(processRequestStruct* req){
         ss->status = 0;
 
         //sending this to client
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ERROR;
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "Failed to connect to storage server");
 
-        strcpy(req2.data, "Failed to connect to storage server");
-
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-
-        if(ch < 0){
-            printf("Failed to send response to client");
-        }
         close(sockfd);
         return;
     }
@@ -440,20 +330,8 @@ void handleCreate(processRequestStruct* req){
         ss->status = 0;
 
         //sending this to client
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ERROR;
-        strcpy(req2.data, "Failed to send request to storage server");
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "Failed to send request to storage server");
 
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-
-        if(ch < 0){
-            printf("Failed to send response to client");
-        }
         close(sockfd);
         return;
     }
@@ -468,21 +346,8 @@ void handleCreate(processRequestStruct* req){
         ss->status = 0;
 
         //sending this to client
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ERROR;
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "Failed to receive response from storage server");
 
-        strcpy(req2.data, "Failed to receive response from storage server");
-
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-
-        if(ch < 0){
-            printf("Failed to send response to client");
-        }
         close(sockfd);
         return;
     }
@@ -502,22 +367,7 @@ void handleCreate(processRequestStruct* req){
         ss->numberOfPaths++;
         pthread_mutex_unlock(&ss->mutex);
 
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ACK;
-        strcpy(req2.data, "File/Folder created successfully");
-
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-        if(ch < 0){
-            printf("Failed to send response to client");
-            // close(clientSockets[req->clientID]);
-            return;
-        }
-
+        sendMessageToClient(clientSockets[req->clientID], ACK, "File/Folder created successfully");
     }
     else if(res.requestType == ACK && (req->requestType == DELETEFILE || req->requestType == DELETEFOLDER)){
         printf("File/Folder deleted successfully\n");
@@ -526,39 +376,13 @@ void handleCreate(processRequestStruct* req){
         delete_path(ss->root, cr.path);
         pthread_mutex_unlock(&ss->mutex);
 
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ACK;
-        strcpy(req2.data, "File/Folder deleted successfully");
-
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-        if(ch < 0){
-            printf("Failed to send response to client");
-            // close(clientSockets[req->clientID]);
-            return;
-        }
+        sendMessageToClient(clientSockets[req->clientID], ACK, "File/Folder deleted successfully");
     }
     else if(res.requestType == ERROR){
-        printf("Error processing request\n");
-        request req2;
-        memset(&req2, 0, sizeof(request));
-        req2.requestType = ERROR;
-        strcpy(req2.data, res.data);
+        printf("Error : %s\n", res.data);
 
-        char buffer[sizeof(request)];
-        memset(buffer, 0, sizeof(buffer));
-        memcpy(buffer, &req2, sizeof(request));
-
-        int ch = send(clientSockets[req->clientID], buffer, sizeof(request), 0);
-        if(ch < 0){
-            printf("Failed to send response to client");
-            // close(clientSockets[req->clientID]);
-            return;
-        }
+        //sending this to client
+        sendMessageToClient(clientSockets[req->clientID], ERROR, res.data);
     }
 
     close(sockfd);
@@ -569,12 +393,15 @@ void handleCreate(processRequestStruct* req){
 void* processRequests(void* args){
     processRequestStruct* req = (processRequestStruct*)args;
     printf("Processing request\n");
+
+    sendMessageToClient(clientSockets[req->clientID], ACK, "Request received");
+
     if(req->requestType == INITSS){
         StorageServer ss;
         memset(&ss, 0, sizeof(StorageServer));
         memcpy(&ss, req->data, sizeof(StorageServer));
         printf("Connecting to storage server %s:%d\n", ss.ssIP, ss.ssPort);
-        connectToSS(ss);
+        connectToSS(ss, clientSockets[req->clientID]);
         clientSockets[req->clientID] = -1;
         close(clientSockets[req->clientID]);
     }
@@ -590,12 +417,52 @@ void* processRequests(void* args){
         clientSockets[req->clientID] = -1;
         close(clientSockets[req->clientID]);
     }
-    else if(req->requestType == WRITESYNC || req->requestType == WRITEASYNC || req->requestType == READ || req->requestType == LIST || req->requestType == INFO || req->requestType == STREAM){
-        handleWrite(req);
+    else if(req->requestType == WRITESYNC || req->requestType == WRITEASYNC || req->requestType == READ || req->requestType == INFO || req->requestType == STREAM){
+        if (req->requestType == READ || req->requestType == INFO) {
+            // combine the request type and path into a single string
+            char command[MAX_STRUCT_LENGTH];
+            memset(command, 0, sizeof(command));
+            sprintf(command, "%d %s", req->requestType, req->data);
+            printf("Command: %s\n", command);
+
+            // create buffer to store data from lru cache
+            char buffer[MAX_STRUCT_LENGTH];
+            memset(buffer, 0, sizeof(buffer));
+
+            printf("printing LRU cache\n");
+            printLRUList(lruCache);
+            printf("Retrieving data from LRU cache\n");
+
+            const char *result = retrieveLRU(lruCache, command);
+            printf("Result: %s\n", result);
+            if (result == NULL) {
+                handleWrite(req);
+            }
+            else {
+                // strcpy(buffer, result);
+                printf("Data retrieved from LRU cache: %s\n", result);
+                // send the data to the client
+                int ch = send(clientSockets[req->clientID], result, sizeof(result), 0);
+                if (ch < 0) {
+                    printf("Failed to send response to client");
+                }
+            }
+        }
+        else {
+            handleWrite(req);
+        }    
+        clientSockets[req->clientID] = -1;
+        close(clientSockets[req->clientID]);    
+    }
+    else if(req->requestType == LIST){
+        listAllPaths(req);
         clientSockets[req->clientID] = -1;
         close(clientSockets[req->clientID]);
     }
+    
 
+    printf("LRU Cache: \n");
+    printLRUList(lruCache);
 
     return NULL;
 }

@@ -1,11 +1,13 @@
 #include "./namingserver.h"
 #include "./requests.h"
 #include "./commonheaders.h"
+
 int serverPorts = 8082;
 StorageServer* storageServersList[MAX_SERVERS];
 int currentServerCount = 0;
 int sockfd;
 int clientSockets[MAX_CLIENTS];
+LRUList* lruCache;
 
 int findFreeClientSocketIndex() {
     for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -96,15 +98,21 @@ while (1) {
 int main(int argc, char *argv[]) {
         for(int i = 0; i < MAX_CLIENTS; i++)
         clientSockets[i] = -1;
+    // lruCache = (LRUList*)malloc(sizeof(LRUList));
+    // lruCache = initializeLRUList(lruCache);
+    lruCache = initializeLRUList();
+    printf("%d\n", lruCache->numLRU);
     printf("Starting naming server...\n");
-    // pthread_create(&req_thread, NULL, setupConnectionToClient, NULL);
-    // if (pthread_create(&req_thread, NULL, setupConnectionToClient, NULL) != 0) {
-    //     perror("Failed to create main setup connection thread");
-    //     return EXIT_FAILURE;
-    // }
-    setupConnectionToClient();
 
-    // pthread_join(req_thread, NULL);  // Wait for the setup thread to finish
-    // pthread_join(req_thread, NULL);
+    for(int i = 0 ; i < MAX_SERVERS ; i++){
+        storageServersList[i] = (StorageServer*)malloc(sizeof(StorageServer));
+        storageServersList[i]->status = -1;
+        storageServersList[i]->numberOfPaths = -1;
+        storageServersList[i]->clientPort = 0;
+        storageServersList[i]->root = NULL;
+        pthread_mutex_init(&storageServersList[i]->mutex, NULL);
+    }
+
+    setupConnectionToClient();
     return 0;
 }

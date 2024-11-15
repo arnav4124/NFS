@@ -4,6 +4,10 @@
 #include "namingserver.h"
 #include "./ss_functions.h"
 #include <errno.h>
+#include "lru.h"
+
+LRUList *lruCache;
+
 // #include "storageserver.c"
 // int itemcount = 0;
  int ns_sockfd;
@@ -11,6 +15,20 @@ void* send_err_to_ns(int Socket,char *msg)
 {
     request pack;
     pack.requestType = ERROR;
+    strcpy(pack.data, msg);
+    char buffer[sizeof(request)];
+    memset(buffer, 0, sizeof(request));
+    memcpy(buffer, &pack, sizeof(request));
+    if(send(Socket, buffer, sizeof(request), 0) < 0){
+        perror("Send failed");
+        close(Socket);
+        return NULL;
+    }
+}
+void* send_async_ack_to_ns(int Socket,char *msg)
+{
+    request pack;
+    pack.requestType = ASYNC_ACK;
     strcpy(pack.data, msg);
     char buffer[sizeof(request)];
     memset(buffer, 0, sizeof(request));
@@ -89,7 +107,16 @@ void * handle_ns_req(void* arg){
         // create the file
         printf("Creating file\n");
         printf("File name: %s\n", req.data);
+        FILE* ch=fopen(req.data,"r");
+        if(ch!=NULL)
+        {
+            perror("File already exists");
+            send_err_to_ns(clientSocket,"File already exists");
+            close(clientSocket);
+            return NULL;
+        }
         FILE *file = fopen(req.data, "w");
+
         if(file==NULL){
             perror("File creation failed");
             close(clientSocket);
@@ -114,7 +141,44 @@ void * handle_ns_req(void* arg){
         printf("File deleted successfully\n");
         send_ack_to_ns(clientSocket,"File deleted successfully");
     }
-    else if(req.requestType==COP)
+    else if(req.requestType==COPYFILE){
+        // copy the file
+        printf("Copying file\n");
+        char* tok = strtok(req.data, "\n");
+        char src[strlen(tok)+1];
+        strcpy(src, tok);
+        tok = strtok(NULL, "\n");
+        char dest[strlen(tok)+1];
+        strcpy(dest, tok);
+        printf("Source: %s\n", src);
+        printf("Destination: %s\n", dest);
+        FILE *srcfile = fopen(src, "r");
+        if(srcfile==NULL){
+            perror("Source file not found");
+            send_err_to_ns(clientSocket,"Source file not found");
+            close(clientSocket);
+            return NULL;
+        }
+        FILE *destfile = fopen(dest, "w");
+        if(destfile==NULL){
+            perror("Destination file creation failed");
+            send_err_to_ns(clientSocket,"Destination file creation failed");
+            close(clientSocket);
+            return NULL;
+        }
+        char data[1024];
+        memset(data, 0, 1024);
+        size_t nread;
+        while((nread = fread(data, 1, 1024, srcfile)) > 0){
+            fwrite(data, 1, nread, destfile);
+        }
+        fclose(srcfile);
+        fclose(destfile);
+        printf("File copied successfully\n");
+        send_ack_to_ns(clientSocket,"File copied successfully");
+    }
+    
+    
     // else if(req.requestType==LIST)
     // {el
     //     // list the folder
@@ -213,7 +277,7 @@ void* handle_client_req(void* arg)
     memset(buffer, 0, sizeof(request));
     if(recv(clientSocket, buffer, sizeof(request), 0) < 0){
         perror("Receive failed");
-        
+        send_err_to_ns(clientSocket,"Receive failed");
         close(clientSocket);
         return NULL;
     }
@@ -224,14 +288,19 @@ void* handle_client_req(void* arg)
     printf("Request type: %d\n", req.requestType);
     // check the request type
     if(req.requestType==READ){
+        char command[MAX_STRUCT_LENGTH];
+        memset(command, 0, MAX_STRUCT_LENGTH);
+        snprintf(command, MAX_STRUCT_LENGTH, "%d %s", req.requestType, req.data);
+
         // read the file
 
         char *filename = req.data;
         FILE *file = fopen(filename, "r");
         if(file==NULL){
             perror("File not found");
-            close(clientSocket);
             send_err_to_ns(clientSocket,"File not found");
+            close(clientSocket);
+            // send_err_to_ns(clientSocket,"File not found");
             return NULL;
         }
         fseek(file, 0, SEEK_END);
@@ -240,6 +309,15 @@ void* handle_client_req(void* arg)
         char *filedata = (char*)malloc(size);
         fread(filedata, 1, size, file);
         fclose(file);
+        
+        printf("Enqueueing LRU\n");
+        printf("Command: %s\n", command);
+        printf("Filedata: %s\n", filedata);
+        enqueueLRU(lruCache, command, filedata);
+
+        printf("printing lru cache\n");
+        printLRUList(lruCache);
+
         printf("Sending file data to client\n");
         request pack;
         pack.requestType = READ;
@@ -254,6 +332,11 @@ void* handle_client_req(void* arg)
             return NULL;
         }
         free(filedata);
+        printf("File data sent successfully\n");
+
+        
+
+        send_ack_to_ns(clientSocket,"File data sent successfully");
 
 
     }
@@ -271,25 +354,56 @@ void* handle_client_req(void* arg)
         FILE *file = fopen(filename, "a");
         if(file==NULL){
             perror("File not found");
+            send_err_to_ns(clientSocket,"File not found");
             close(clientSocket);
             return NULL;}
              
-        
+        if(strlen(data)>3000){
+            send_async_ack_to_ns(clientSocket,"File written successfully"); 
+        }
         fprintf(file, "%s", data);
 
         fclose(file);
         printf("File written successfully\n");
+        send_ack_to_ns(clientSocket,"File written successfully");
        
         }   
+        else if (req.requestType==WRITESYNC){
+             printf("Writing file\n");
+        printf("Data: %s\n", req.data);
+        char* tok=strtok(req.data, "\n");
+        char filename[strlen(tok)+1];
+        strcpy(filename, tok);
+        printf("Filename: %s\n", filename);
+        tok=strtok(NULL, "\n");
+        char data[strlen(tok)+1];
+        strcpy(data, tok);
+        FILE *file = fopen(filename, "a");
+        if(file==NULL){
+            perror("File not found");
+            send_err_to_ns(clientSocket,"File not found");
+            close(clientSocket);
+            return NULL;}
+             
+        // if(strlen(data)>3000){
+            send_async_ack_to_ns(clientSocket,"File written successfully"); 
+        // }
+        fprintf(file, "%s", data);
+        fflush(file);
+        fclose(file);
+        printf("File written successfully\n");
+        send_ack_to_ns(clientSocket,"File written successfully");
+        }
     else if(req.requestType==STREAM){
           FILE*  file = fopen(req.data, "rb");
           printf("Audio name: %s\n", req.data);
         if(file==NULL){
             perror("File not found");
+            send_err_to_ns(clientSocket,"File not found");
             close(clientSocket);
             return NULL;}
         char data[MAX_STRUCT_LENGTH-2];
-        memset(data, 0, MAX_STRUCT_LENGTH);
+        memset(data, 0, MAX_STRUCT_LENGTH - 2);
         size_t nread;
         int count=0;
         while((nread = fread(data, 1, MAX_STRUCT_LENGTH, file)) > 0){
@@ -310,11 +424,12 @@ void* handle_client_req(void* arg)
         }
         printf("Count: %d\n", count);
         printf("Audio File sent successfully\n");
+        send_ack_to_ns(clientSocket,"Audio File sent successfully");
         
     } 
 
         itemcount--;
-
+    close(clientSocket);
     
 }
 // function to listen the client request

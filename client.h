@@ -11,6 +11,13 @@
 #include <pthread.h>
 #include <time.h>
 #include <sys/wait.h>
+#include <sys/select.h>
+#include <errno.h>
+
+typedef struct {
+    int ss_sockfd;
+    int* ack_received;
+} AckThreadArgs;
 
 
 #endif

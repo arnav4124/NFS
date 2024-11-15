@@ -120,6 +120,28 @@ void print_paths(struct trie_node *root)
     }
 }
 
+// Copy all the paths in the trie to a buffer
+void copy_paths(struct trie_node *root, char* buffer){
+    if (root == NULL)
+    {
+        return;
+    }
+
+    if (root->end == 1)
+    {
+        strcat(buffer, root->key);
+        strcat(buffer, "\n");
+    }
+
+    for (int i = 0; i < 256; i++)
+    {
+        if (root->children[i] != NULL)
+        {
+            copy_paths(root->children[i], buffer);
+        }
+    }
+}
+
 // Returns all the paths in the form of a linked list
 linked_list_head return_paths(struct trie_node *root)
 {
