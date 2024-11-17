@@ -9,26 +9,11 @@
 #include <pthread.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include<fts.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#define PORT 8083
-#define CLIENT_PORT 8084
 #define MAX_CLIENTS 10
-// #define SERVER_PORT 8083
-
-// Enumeration for request types
-// typedef enum {
-//     READ,
-//     WRITE,
-//     DELETE
-// } RequestType;
-
-// Structure for request
-// typedef struct {
-//     RequestType requestType;
-//     char data[1024]; // Adjust size based on your requirements
-// } request;
 
 // Function declarations
 void* handle_ns_req(void* arg);
@@ -36,4 +21,18 @@ void* NS_listener(void* arg);
 void* handle_client_req(void* arg);
 void* Client_listner(void* arg);
 
-#endif // STORAGE_SERVER_H
+#define MAX_CHUNK_AT_A_TIME 10
+
+typedef struct{
+    char* buffer;
+    char path[MAX_PATH_LENGTH];
+} threadArg;
+
+typedef struct file_dir{
+    int isFile;
+    char path[MAX_PATH_LENGTH];
+    char name[MAX_NAME_LENGTH];
+    char data[MAX_STRUCT_LENGTH];
+}file_dir;
+#endif // STORAGE_SERVER2_H 
+

@@ -14,6 +14,17 @@
 
 void* processRequests(void* args);
 
+typedef struct writePathNode {
+    char path[MAX_PATH_LENGTH];
+    int clientID;
+    pthread_mutex_t mutex;
+    struct writePathNode* next;
+} writePathNode;
+
+extern writePathNode* writePathsLL;
+extern pthread_mutex_t writePathsLLMutex;
+
+
 // void addAccessiblePaths(char* path, int serverIndex);
 
 void createFile(char* path, char* name);

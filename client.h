@@ -15,7 +15,7 @@
 #include <errno.h>
 
 typedef struct {
-    int ss_sockfd;
+    int sockfd;
     int* ack_received;
 } AckThreadArgs;
 

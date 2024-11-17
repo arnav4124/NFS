@@ -12,26 +12,23 @@ typedef enum {
    DELETEFILE,
    DELETEFOLDER,
    COPYFILE,
-   COPYFOLDER,    
+   COPYFOLDER, 
+   PASTE,
+   PASTEFILE,
+   PASTEFOLDER,
+   COPYFILESAME,
+   COPYFOLDERSAME,   
    LIST,
    INFO,
    STREAM,
-   LRU,
    INITSS,
    ACK,
    ERROR,
-   ASYNC_ACK,
+   ASYNC_WRITE_ACK,
+   REGISTER_PATH,
+   STOP,
 } requestType;
 
-typedef enum{
-    IP,
-    PORT,
-} ssFields;
-
-typedef enum{
-    PATH,
-    DATA,
-} nsFields;
 
 #define MAX_IPOP_LENGTH 20
 #define MAX_PATH_LENGTH 1024
@@ -39,6 +36,7 @@ typedef enum{
 #define MAX_DATA_LENGTH 4096
 #define MAX_STRUCT_LENGTH 5000
 #define STREAM_BUFFER_SIZE 1000000
+#define MAX_WRITE_BUFFER_SIZE 10000000
 
 typedef struct {
     requestType requestType;

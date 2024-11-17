@@ -6,8 +6,8 @@
 #include "ss_functions.h"
 #include <errno.h>
 #define QUEUE_SIZE 1024
-#define PORT 8083
-#define CLIENT_PORT 8084
+// #define PORT 8083
+#define CLIENT_PORT PORT+1
 int ns_send_socket;
 int queue[QUEUE_SIZE];
 int front = 0;
@@ -119,15 +119,21 @@ int connect_to_ns(char *ns_ip, int ns_port,char* argv) {
     char buffer1[1024];
     memset(buffer1, 0, sizeof(buffer1));
     while (fgets(buffer1, sizeof(buffer1), fp) != NULL) {
+        buffer1[strlen(buffer1) - 1] = ' ';
+        char * buffer2 = buffer1;
         printf("buffer1: %s\n", buffer1);
-        buffer1[strlen(buffer1) - 1] = '\0';
-        if (send(sockfd, buffer1, sizeof(buffer1), 0) < 0) {
-            perror("ERROR sending data");
-            fclose(fp);
-            close(sockfd);
-            return -1;
+        int sz = strlen(buffer1);
+        while(sz > 0){
+            int sent = send(sockfd, buffer2, sz, 0);
+            if(sent < 0) {
+                printf("Error sending data\n");
+                fclose(fp);
+                close(sockfd);
+                return -1;
+            }
+            sz -= sent;
+            buffer2 += sent;
         }
-        memset(buffer1, 0, sizeof(buffer1));
     }
     // Send IP, port, and identifier information to the Name Server
    

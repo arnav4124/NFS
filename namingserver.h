@@ -27,7 +27,6 @@
 #define MAX_CLIENTS 10
 
 extern int clientSockets[MAX_CLIENTS];
-// extern LRUList* lruCache;
 
 typedef struct {
   char ssIP[20];
@@ -39,10 +38,12 @@ typedef struct {
   pthread_mutex_t mutex;
 } StorageServer;
 
-extern   int currentServerCount ;
+extern int currentServerCount;
 extern StorageServer* storageServersList[MAX_SERVERS];
 
 extern int sockfd;
 
 extern int serverPorts ;
+
+extern LRUList* lruCache;
 #endif

@@ -13,6 +13,7 @@
 #include <pthread.h>
 #define QUEUE_SIZE 1024
 #define NS_PORT 8082
+#define NS_IP "127.0.0.1"
 extern int queue[QUEUE_SIZE];
 extern int front;
 extern int rear;

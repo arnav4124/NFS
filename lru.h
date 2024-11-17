@@ -12,30 +12,24 @@
 typedef struct LRUNode LRUNode;
 
 struct LRUNode {
-    char command[MAX_STRUCT_LENGTH];
-    char data[MAX_STRUCT_LENGTH];
+    char path[MAX_PATH_LENGTH];
+    int ssid;
     LRUNode *next; 
 };
 
 typedef struct {
     int numLRU;
+    int maxLRU;
     LRUNode *head;
     LRUNode *tail;
-    // pthread_mutex_t mutex;
+    pthread_mutex_t mutex;
 } LRUList;
 
-extern LRUList *lruCache;
-
-// LRUList* initializeLRUList(LRUList *lruList);
-// void enqueueLRU(LRUList **list, const char *command, const char *data);
-// void dequeueLRU(LRUList **list);
-// const char* retrieveLRU(LRUList **list, const char *command);
-// void printLRUList(LRUList **list);
-
-LRUList* initializeLRUList();
-void enqueueLRU(LRUList *list, const char *command, const char *data);
-void dequeueLRU(LRUList *list);
-const char* retrieveLRU(LRUList *list, const char *command);
-void printLRUList(LRUList *list);
+LRUList* createLRUList(int max);
+void enqueueLRU(LRUList **list, const char *path, const int ssid);
+void dequeueLRU(LRUList **list);
+int retrieveLRU(LRUList **list, const char *path);
+void removeFromLRU(LRUList **list, const char *path);
+void printLRUList(LRUList **list);
 
 #endif

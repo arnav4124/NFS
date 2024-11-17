@@ -7,7 +7,11 @@ StorageServer* storageServersList[MAX_SERVERS];
 int currentServerCount = 0;
 int sockfd;
 int clientSockets[MAX_CLIENTS];
+
 LRUList* lruCache;
+
+writePathNode* writePathsLL;
+pthread_mutex_t writePathsLLMutex;
 
 int findFreeClientSocketIndex() {
     for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -58,6 +62,14 @@ while (1) {
     int len = sizeof(clientaddr);
     clientSockets[clientSocketID] = accept(sockfd, (struct sockaddr *)&clientaddr, (socklen_t*)&len);
 
+    //get port of client
+    struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&clientaddr;
+    struct in_addr ipAddr = pV4Addr->sin_addr;
+    char str[INET_ADDRSTRLEN];
+    inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
+    printf("Client IP: %s\n", str);
+
+
     if (clientSockets[clientSocketID] < 0) {
         perror("Client accept failed");
         continue;
@@ -90,7 +102,6 @@ while (1) {
         clientSockets[clientSocketID] = -1;
     } 
 }
-
     close(sockfd);
     return;
 }
@@ -98,10 +109,6 @@ while (1) {
 int main(int argc, char *argv[]) {
         for(int i = 0; i < MAX_CLIENTS; i++)
         clientSockets[i] = -1;
-    // lruCache = (LRUList*)malloc(sizeof(LRUList));
-    // lruCache = initializeLRUList(lruCache);
-    lruCache = initializeLRUList();
-    printf("%d\n", lruCache->numLRU);
     printf("Starting naming server...\n");
 
     for(int i = 0 ; i < MAX_SERVERS ; i++){
@@ -112,6 +119,10 @@ int main(int argc, char *argv[]) {
         storageServersList[i]->root = NULL;
         pthread_mutex_init(&storageServersList[i]->mutex, NULL);
     }
+
+    lruCache = createLRUList(MAX_LRU_SIZE);
+    writePathsLL = NULL;
+    pthread_mutex_init(&writePathsLLMutex, NULL);
 
     setupConnectionToClient();
     return 0;
