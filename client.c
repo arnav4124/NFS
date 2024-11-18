@@ -4,6 +4,12 @@
 
 // #define TIMEOUT 1000
 
+#define RED "\033[1;31m"
+#define GREEN "\033[1;32m"
+#define YELLOW "\033[1;33m"
+#define CYAN "\033[1;36m"
+#define RESET "\033[0m"
+
 void *listenForBackgroundAck(void *arg)
 {
     AckThreadArgs *args = (AckThreadArgs *)arg;
@@ -14,7 +20,7 @@ void *listenForBackgroundAck(void *arg)
     timeout2.tv_sec = 0;  
     timeout2.tv_usec = 0;
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout2, sizeof(timeout2)) < 0) {
-        perror("Error removing socket timeout2");
+        perror(RED "Error removing socket timeout2\n" RESET);
         close(sockfd);
         return NULL;
     }
@@ -24,20 +30,23 @@ void *listenForBackgroundAck(void *arg)
     if (bytes_received <= 0)
     {
         if (bytes_received < 0)
-            perror("Error: recv() failed");
+            perror(RED "Error: recv() failed\n" RESET);
         *ack_received = 0;
     }
     else
     {
         if (ack_packet.requestType == ACK)
         {
-            printf("\nReceived acknowledgment from naming server: %s\n", ack_packet.data);
+            // printf(GREEN "\nReceived acknowledgment from naming server: %s\n" RESET, ack_packet.data);
+            printf(GREEN "%s\n" RESET, ack_packet.data);
             *ack_received = 1;
-            printf("Operation acknowledged by naming server\n");
+            // printf("Operation acknowledged by naming server\n");
         }
         else
         {
-            printf("\nReceived unexpected response type: %d\n", ack_packet.requestType);
+            // printf("\nReceived unexpected response type: %d\n", ack_packet.requestType);
+            // printf("Received response data: %s\n", ack_packet.data);
+            printf(RED "%s\n" RESET, ack_packet.data);
             *ack_received = 0;
         }
     }
@@ -78,14 +87,14 @@ requestType getRequestType(const char* operation) {
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
-        printf("Usage: %s <naming server ip>\n", argv[0]);
+        printf(CYAN "Usage: %s <naming server ip>\n" RESET, argv[0]);
         exit(1);
     }
     char* nsip = argv[1];
     // printf("Naming server IP: %s\n", nsip);
     char input[MAX_NAME_LENGTH];
     char operation[MAX_IPOP_LENGTH], arg1[MAX_PATH_LENGTH], arg2[MAX_PATH_LENGTH];
-    printf("...............Client starting.............\n");
+    printf(CYAN "...............Client starting.............\n" RESET);
 
     while (1) {
         printf("Enter Command: ");
@@ -99,7 +108,7 @@ int main(int argc, char* argv[]) {
         arg2[0] = '\0';
         char* token = strtok(input, " ");
         if (token == NULL) {
-            printf("Error: No operation provided.\n");
+            printf(RED "Error: No operation provided.\n" RESET);
             continue;
         }
         strncpy(operation, token, MAX_IPOP_LENGTH);
@@ -120,7 +129,7 @@ int main(int argc, char* argv[]) {
                 strcpy(arg2, normalizePath(arg2));
                 if (strcmp(arg2, "--SYNC") == 0) req.requestType = WRITESYNC;
                 else {
-                    printf("Error: Unrecognized flag for WRITE operation.\n");
+                    printf(RED "Error: Unrecognized flag for WRITE operation.\n" RESET);
                     continue;
                 }                
             }
@@ -134,11 +143,11 @@ int main(int argc, char* argv[]) {
             }
         }
         if (!(req.requestType == LIST) && !arg1[0]) {
-            printf("Error: Invalid format, missing primary argument.\n");
+            printf(RED "Error: Invalid format, missing primary argument.\n" RESET);
             continue;
         }
         if ((strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "CREATEFILE") == 0 || strcmp(operation, "COPYFILE") == 0 || strcmp(operation, "COPYFOLDER") == 0) && !arg2[0]) {
-            printf("Error: Missing second argument for %s operation.\n", operation);
+            printf(RED "Error: Missing second argument for %s operation.\n" RESET, operation);
             continue;
         }
         if (arg1[0] && arg2[0] && req.requestType != WRITESYNC && req.requestType != LIST) snprintf(req.data, MAX_STRUCT_LENGTH, "%s %s", arg1, arg2);

@@ -4,7 +4,7 @@
 #include "namingserver.h"
 #include "./ss_functions.h"
 #include <errno.h>
-#include "lru.h"
+#include "./lru.h"
 
 #define CLIENT_PORT PORT+1
 
@@ -317,8 +317,6 @@ void* send_path_to_ns(char* cwd, char* path,int fl)
         return NULL;
 
     }
-    
-
     
     // convert PORT to string
     char port[10];

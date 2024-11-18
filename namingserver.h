@@ -31,7 +31,7 @@ extern int clientSockets[MAX_CLIENTS];
 typedef struct {
   char ssIP[20];
   int ssPort;
-  struct trie_node* root;
+  TrieNode* root;
   int clientPort;
   int status;
   int numberOfPaths;

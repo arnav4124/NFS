@@ -1,219 +1,158 @@
 #include "./trie.h"
 
-// Creates a new trie node
-struct trie_node *create_trie_node()
-{
-    // Allocating memory to the node
-    struct trie_node *node = (struct trie_node *) malloc(sizeof(struct trie_node));
-    if (node == NULL)
-    {
-        fprintf(stderr, RED("malloc : could not allocate memory to trie node : %s\n"), strerror(errno));
+// Initialize a new trie node
+TrieNode *initialize_node() {
+    TrieNode *node = (TrieNode *)malloc(sizeof(TrieNode));
+    if (!node) {
+        fprintf(stderr, ERROR_MSG("Failed to allocate memory for trie node: %s\n"), strerror(errno));
         return NULL;
     }
-    node->key = NULL;   // Initially there is no string stored in the node (strings are stored only in end nodes)
-    node->end = 0;      // Initially the node is not an end node
-    node->ssid = -1;    // Initially no ssid is assigned to node
-    // 256 childrens 1 for each of the ASCII characters
-    for (int i = 0; i < 256; i++)
-    {
+    node->path_fragment = NULL;
+    node->is_terminal = 0;
+    node->id = -1;
+    for (int i = 0; i < 256; ++i) {
         node->children[i] = NULL;
     }
     return node;
 }
 
-// A function to insert a string into the trie, Returns 1 if successfull else 0
-int insert_path(struct trie_node *root, char *key,int ssid)
-{
-    // Starting from the root node
-    printf("Inserting %s\n",key);
-    struct trie_node *current = root;
-    for (int i = 0; key[i] != '\0'; i++)
-    {
-        // Index is just the ASCII value of that character
-        int index = (int)key[i];
-
-        // If that node does not exist already then just create one
-        if (current->children[index] == NULL)
-        {
-            current->children[index] = create_trie_node();
-            if (current->children[index] == NULL)
-            {
-                fprintf(stderr, RED("create_trie_node : could not create node.\n"));
+// Insert a path into the trie
+int add_path(TrieNode *root, const char *path, int id) {
+    printf("Adding path: %s\n", path);
+    TrieNode *current = root;
+    for (size_t i = 0; path[i] != '\0'; ++i) {
+        int index = (unsigned char)path[i];
+        if (!current->children[index]) {
+            current->children[index] = initialize_node();
+            if (!current->children[index]) {
+                fprintf(stderr, ERROR_MSG("Failed to create a new trie node.\n"));
                 return 0;
             }
         }
-        // Move to that node
         current = current->children[index];
     }
-    // We have reached the end of the string that is to be stored so we are at the final node so just store the string as the key and mark this node as one of the end nodes
-    current->key = key;
-    current->end = 1;
-    current->ssid = ssid;
+    current->path_fragment = strdup(path);
+    current->is_terminal = 1;
+    current->id = id;
     return 1;
 }
 
-// A function to search for a string in the trie, Returns 1 if path is found else 0
-int search_path(struct trie_node *root, char *key)
-{
-    // Starting from the root node
-    struct trie_node *current = root;
-    for (int i = 0; key[i] != '\0'; i++)
-    {
-        int index = (int)key[i];
-
-        if (current->children[index] == NULL)
-        {
-            // If the character we are looking for is not present as the child then the string is not present in the trie
+// Search for a path in the trie
+int find_path(TrieNode *root, const char *path) {
+    TrieNode *current = root;
+    for (size_t i = 0; path[i] != '\0'; ++i) {
+        int index = (unsigned char)path[i];
+        if (!current->children[index]) {
             return -1;
         }
         current = current->children[index];
     }
-
-    if (current->end == 1)
-    {
-        return current->ssid;
-    }
-    return -1;
+    return current->is_terminal ? current->id : -1;
 }
 
-// A function to delete a string from the trie, Returns 1 if successfull else 0
-int delete_path(struct trie_node *root, char *key)
-{
-    // Lazy deletion
-    struct trie_node *current = root;
-    for (int i = 0; key[i] != '\0'; i++)
-    {
-        int index = (int) key[i];
-
-        if (current->children[index] == NULL)
-        {
+// Remove a path from the trie (lazy deletion)
+int remove_path(TrieNode *root, const char *path) {
+    TrieNode *current = root;
+    for (size_t i = 0; path[i] != '\0'; ++i) {
+        int index = (unsigned char)path[i];
+        if (!current->children[index]) {
             return 0;
         }
         current = current->children[index];
     }
-    
-    current->key = NULL;
-    current->end = 0;
-    current->ssid = -1;
+    current->path_fragment = NULL;
+    current->is_terminal = 0;
+    current->id = -1;
     return 1;
 }
 
-// Prints all the paths present in the trie
-void print_paths(struct trie_node *root)
-{
-    if (root == NULL)
-    {
-        return;
+// Print all paths in the trie
+void display_paths(TrieNode *root) {
+    if (!root) return;
+    if (root->is_terminal) {
+        printf("%s %d\n", root->path_fragment, root->id);
     }
-
-    if (root->end == 1)
-    {
-        printf("%s %d\n", root->key,root->ssid);
-    }
-
-    for (int i = 0; i < 256; i++)
-    {
-        if (root->children[i] != NULL)
-        {
-            print_paths(root->children[i]);
+    for (int i = 0; i < 256; ++i) {
+        if (root->children[i]) {
+            display_paths(root->children[i]);
         }
     }
 }
 
-// Copy all the paths in the trie to a buffer
-void copy_paths(struct trie_node *root, char* buffer){
-    if (root == NULL)
-    {
-        return;
-    }
-
-    if (root->end == 1)
-    {
-        strcat(buffer, root->key);
+// Copy all paths into a buffer
+void store_paths_in_buffer(TrieNode *root, char *buffer) {
+    if (!root) return;
+    if (root->is_terminal) {
+        strcat(buffer, root->path_fragment);
         strcat(buffer, "\n");
     }
-
-    for (int i = 0; i < 256; i++)
-    {
-        if (root->children[i] != NULL)
-        {
-            copy_paths(root->children[i], buffer);
+    for (int i = 0; i < 256; ++i) {
+        if (root->children[i]) {
+            store_paths_in_buffer(root->children[i], buffer);
         }
     }
 }
 
-// Returns all the paths in the form of a linked list
-linked_list_head return_paths(struct trie_node *root)
-{
-    linked_list_head ll = create_linked_list_head();
-    add_paths(ll,root);
-    return ll;
-}
-
-// Adds paths one by one recursively to the linked list
-void add_paths(linked_list_head ll, struct trie_node *root)
-{
-    if (root == NULL)
-    {
-        return;
+// Initialize a new path list
+PathList *initialize_path_list() {
+    PathList *list = (PathList *)malloc(sizeof(PathList));
+    if (!list) {
+        fprintf(stderr, ERROR_MSG("Failed to allocate memory for path list: %s\n"), strerror(errno));
+        return NULL;
     }
+    list->size = 0;
+    list->head = NULL;
+    list->tail = NULL;
+    return list;
+}
 
-    if (root->end == 1)
-    {
-        insert_in_linked_list(ll, root->key);
+// Initialize a new path node
+PathNode *initialize_path_node(const char *path) {
+    PathNode *node = (PathNode *)malloc(sizeof(PathNode));
+    if (!node) {
+        fprintf(stderr, ERROR_MSG("Failed to allocate memory for path node: %s\n"), strerror(errno));
+        return NULL;
     }
-
-    for (int i = 0; i < 256; i++)
-    {
-        if (root->children[i] != NULL)
-        {
-            add_paths(ll, root->children[i]);
-        }
-    }
+    node->path = strdup(path);
+    node->next = NULL;
+    return node;
 }
 
-// Linked list functions
-linked_list_head create_linked_list_head() {
-    linked_list_head linked_list = (linked_list_head) malloc(sizeof(linked_list_head_struct));
-    linked_list->number_of_nodes = 0;
-    linked_list->first = NULL;
-    linked_list->last = NULL;
-    return linked_list;
-}
-
-linked_list_node create_linked_list_node(char* path) {
-    linked_list_node N = (linked_list_node) malloc(sizeof(linked_list_node_struct));
-    N->next = NULL;
-    N->path = (char*) calloc(MAX_PATH_LENGTH, sizeof(char));
-    strcpy(N->path, path);
-    return N;
-}
-
-void insert_in_linked_list(linked_list_head linked_list, char* path) {
-    linked_list_node N = create_linked_list_node(path);
-    if (linked_list->number_of_nodes == 0) {
-        linked_list->first = N;
-        linked_list->last = N;
-        linked_list->number_of_nodes++;
-    } else if (linked_list->number_of_nodes == 1) {
-        linked_list->last = N;
-        linked_list->first->next = N;
-        linked_list->number_of_nodes++;
+// Append a path to the list
+void append_to_list(PathList *list, const char *path) {
+    PathNode *node = initialize_path_node(path);
+    if (!node) return;
+    if (!list->head) {
+        list->head = node;
+        list->tail = node;
     } else {
-        linked_list->last->next = N;
-        linked_list->last = N;
-        linked_list->number_of_nodes++;
+        list->tail->next = node;
+        list->tail = node;
+    }
+    list->size++;
+}
+
+// Collect paths recursively into a path list
+void collect_paths(PathList *list, TrieNode *root) {
+    if (!root) return;
+    if (root->is_terminal) {
+        append_to_list(list, root->path_fragment);
+    }
+    for (int i = 0; i < 256; ++i) {
+        if (root->children[i]) {
+            collect_paths(list, root->children[i]);
+        }
     }
 }
 
-void free_linked_list(linked_list_head linked_list) {
-    linked_list_node trav = linked_list->first;
-    while (trav != NULL) {
-        free(trav->path);
-        linked_list_node temp = trav->next;
-        free(trav);
-        trav = temp;
+// Free the memory allocated for the path list
+void release_path_list(PathList *list) {
+    PathNode *current = list->head;
+    while (current) {
+        PathNode *temp = current;
+        free(temp->path);
+        current = current->next;
+        free(temp);
     }
-    free(linked_list);
+    free(list);
 }
-

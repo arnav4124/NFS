@@ -8,7 +8,7 @@ define HASH
 endef
 
 # Compiler flags
-CFLAGS = -Wall -std=c99 -g -Wno-$(HASH)warnings
+CFLAGS = -Wall -g -Wno-$(HASH)warnings
  
 # Source files
 all : client nm 1ss 2ss

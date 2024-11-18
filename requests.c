@@ -66,7 +66,7 @@ int retrievePathIndex(char* path){
 
     for(int i = 0; i < currentServerCount && storageServersList[i]->status == 1; i++){
         pthread_mutex_lock(&storageServersList[i]->mutex);
-        if(search_path(storageServersList[i]->root, path) >= 0){
+        if(find_path(storageServersList[i]->root, path) >= 0){
             pthread_mutex_unlock(&storageServersList[i]->mutex);
             return i;
         }
@@ -153,7 +153,7 @@ void connectToSS(StorageServer ss, int ssSocket){
             strcpy(storageServersList[i]->ssIP, ss.ssIP);
             storageServersList[i]->ssPort = ss.ssPort;
             storageServersList[i]->clientPort = ss.clientPort;
-            storageServersList[i]->root = create_trie_node();
+            storageServersList[i]->root = initialize_node();
             storageServersList[i]->numberOfPaths = 0;
             storageServersList[i]->status = 1;
             currentServerCount++;
@@ -173,7 +173,7 @@ void connectToSS(StorageServer ss, int ssSocket){
             char* token = strtok(buffer, " ");
             pthread_mutex_lock(&storageServersList[i]->mutex);
             while(token != NULL){
-                insert_path(storageServersList[i]->root, token, i);
+                add_path(storageServersList[i]->root, token, i);
                 storageServersList[i]->numberOfPaths++;
                 token = strtok(NULL, " ");
             }
@@ -256,7 +256,8 @@ void handleCopyingFiles(processRequestStruct* req){
     }
 
     //check if file is already being written to
-    if(tryWritePath(&writePathsLL, path_dest) == 0){
+    if(tryWritePath(&writePathsLL, path_source) == 0){
+        printf("Path is already being written to\n");
         sendMessageToClient(clientSockets[req->clientID], ERROR, "Path is already being written to");
         return;
     }
@@ -290,7 +291,8 @@ void handleClientSSRequests(processRequestStruct* req){
     memset(&cr, 0, sizeof(client_request));
     //req->data has path
     strcpy(cr.path, req->data);
-    printf("Path: %s\n", cr.path);  
+    printf("Path: %s\n", cr.path);   
+    
 
     // check if path is already being written to
     if(tryWritePath(&writePathsLL, req->data) == 0){
@@ -408,7 +410,7 @@ void handleDelete(processRequestStruct* req){
         printf("File/Folder deleted successfully\n");
         // delete path from the trie
         pthread_mutex_lock(&ss->mutex);
-        delete_path(ss->root, data);
+        remove_path(ss->root, data);
         ss->numberOfPaths--;
         pthread_mutex_unlock(&ss->mutex);
 
@@ -434,7 +436,7 @@ void listAllPaths(processRequestStruct* req){
         pthread_mutex_lock(&storageServersList[i]->mutex);
         char paths[MAX_STRUCT_LENGTH];
         memset(paths, 0, sizeof(paths));
-        copy_paths(storageServersList[i]->root, paths);
+        store_paths_in_buffer(storageServersList[i]->root, paths);
         strcat(data, paths);
         strcat(data, "\n");
         pthread_mutex_unlock(&storageServersList[i]->mutex);
@@ -492,7 +494,7 @@ void handleCreate(processRequestStruct* req){
     }
 
     // check if the file/folder already exists
-    if(search_path(ss->root, data) >= 0){
+    if(find_path(ss->root, data) >= 0){
         printf("File/Folder already exists\n");
         //sending this to client
         sendMessageToClient(clientSockets[req->clientID], ERROR, "File/Folder already exists");
@@ -558,7 +560,7 @@ void handleCreate(processRequestStruct* req){
         printf("File/Folder created successfully\n");
         // add path to the trie
         pthread_mutex_lock(&ss->mutex);
-        insert_path(ss->root, data, checkPathIfPresent);
+        add_path(ss->root, data, checkPathIfPresent);
         ss->numberOfPaths++;
         pthread_mutex_unlock(&ss->mutex);
 
@@ -568,7 +570,7 @@ void handleCreate(processRequestStruct* req){
         printf("File/Folder deleted successfully\n");
         // delete path from the trie
         pthread_mutex_lock(&ss->mutex);
-        delete_path(ss->root, data);
+        remove_path(ss->root, data);
         pthread_mutex_unlock(&ss->mutex);
 
         sendMessageToClient(clientSockets[req->clientID], ACK, "File/Folder deleted successfully");
@@ -662,7 +664,7 @@ void* processRequests(void* args){
         for(int i = 0; i < currentServerCount && storageServersList[i]->status == 1; i++){
             if(storageServersList[i]->ssPort == port){
                 pthread_mutex_lock(&storageServersList[i]->mutex);
-                insert_path(storageServersList[i]->root, path, i);
+                add_path(storageServersList[i]->root, path, i);
                 storageServersList[i]->numberOfPaths++;
                 pthread_mutex_unlock(&storageServersList[i]->mutex);
                 break;
