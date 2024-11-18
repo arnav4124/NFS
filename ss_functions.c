@@ -273,7 +273,7 @@ int recursive_delete(const char *dir)
     return r;
 }
 
-void* send_path_to_ns(char* cwd, char* path)
+void* send_path_to_ns(char* cwd, char* path,int fl)
 {
     struct sockaddr_in serv_addr;
     int sockfd;
@@ -301,9 +301,36 @@ void* send_path_to_ns(char* cwd, char* path)
     }
     request pack;
     pack.requestType = REGISTER_PATH;
-    strcpy(pack.data, cwd);
+    if(fl) {
+        pack.requestType=REGISTER_PATH_STOP;
+        // char port[10];
+   
+    strcpy(pack.data,cwd);
+    char buff3[sizeof(request)];
+    memset(buff3, 0, sizeof(request));
+    memcpy(buff3, &pack, sizeof(request));
+    if(send(sockfd, buff3, sizeof(request), 0) < 0){
+        printf("Send failed");
+        close(sockfd);
+        return NULL;
+    }
+        return NULL;
+
+    }
+    
+
+    
+    // convert PORT to string
+    char port[10];
+    sprintf(port, "%d", PORT);
+    printf("Port: %s\n", port);
+    strcpy(pack.data,port);
+    strcat(pack.data, " ");
+    strcat(pack.data, cwd);
     strcat(pack.data, "/");
     strcat(pack.data, path);
+    printf("Path: %s\n", pack.data);
+    // if(fl) strcat(pack.data, " STOP");
     char buffer[sizeof(request)];
     memset(buffer, 0, sizeof(request));
     memcpy(buffer, &pack, sizeof(request));
@@ -413,12 +440,6 @@ void * handle_ns_req(void* arg){
         // delete the folder
         printf("Deleting folder\n");
         printf("Folder name: %s\n", req.data);
-        // if(rmdir(req.data) < 0){
-        //     printf("Folder deletion failed");
-        //     send_err_to_ns(clientSocket,"Folder deletion failed");
-        //     close(ns_sockfd);
-        //     return NULL;
-        // }
        int a= recursive_delete(req.data);
        if(a==-1){
               printf("Folder deletion failed");
@@ -470,42 +491,7 @@ void * handle_ns_req(void* arg){
         send_ack_to_ns(clientSocket,"File deleted successfully");
         send_unlock_ack_to_ns(req.data);
     }
-    else if(req.requestType==COPYFILE){
-        // copy the file
-        printf("Copying file\n");
-        char* tok = strtok(req.data, "\n");
-        char src[strlen(tok)+1];
-        strcpy(src, tok);
-        tok = strtok(NULL, "\n");
-        char dest[strlen(tok)+1];
-        strcpy(dest, tok);
-        printf("Source: %s\n", src);
-        printf("Destination: %s\n", dest);
-        FILE *srcfile = fopen(src, "r");
-        if(srcfile==NULL){
-            printf("Source file not found");
-            send_err_to_ns(clientSocket,"Source file not found");
-            close(clientSocket);
-            return NULL;
-        }
-        FILE *destfile = fopen(dest, "w");
-        if(destfile==NULL){
-            printf("Destination file creation failed");
-            send_err_to_ns(clientSocket,"Destination file creation failed");
-            close(clientSocket);
-            return NULL;
-        }
-        char data[1024];
-        memset(data, 0, 1024);
-        size_t nread;
-        while((nread = fread(data, 1, 1024, srcfile)) > 0){
-            fwrite(data, 1, nread, destfile);
-        }
-        fclose(srcfile);
-        fclose(destfile);
-        printf("File copied successfully\n");
-        send_ack_to_ns(clientSocket,"File copied successfully");
-    }
+    
     else if (req.requestType==COPYFOLDER)
     {
            char ip[20];
@@ -549,7 +535,89 @@ void * handle_ns_req(void* arg){
                 printf("Calling fts_search\n");
                 fts_search(path,sockfd,dest);
     }
+    else if(req.requestType==COPYFILE)
+    {
+         char ip[20];
+              char port[20];
+                char path[100];
+                char dest[100];
+                char *tok = strtok(req.data, " ");
+                strcpy(ip, tok);
+                tok = strtok(NULL, " ");
+                strcpy(port, tok);
+                tok = strtok(NULL, " ");   
+                strcpy(path, tok);
+                tok = strtok(NULL, " ");
+                strcpy(dest, tok);
+                printf("dest: %s\n", dest);
+                int portno=atoi(port);
+                printf("IP: %s\n", ip);
+                printf("Port: %d\n", portno);
+                printf("Path: %s\n", path);
+                int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+                if (sockfd < 0) {
+                    printf("ERROR opening socket");
+                    return NULL;
+                }
+                struct sockaddr_in serv_addr;
+                struct hostent *server;
+                server = gethostbyname(ip);
+                if (server == NULL) {
+                    fprintf(stderr,"ERROR, no such host\n");
+                    return NULL;
+                }
+                bzero((char *) &serv_addr, sizeof(serv_addr));
+                serv_addr.sin_family = AF_INET;
+                bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
+                serv_addr.sin_port = htons(portno);
+                if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
+                    printf("ERROR connecting");
+                    return NULL;
+                }
+                request pack;
+                pack.requestType = PASTEFILE;
+                strcpy(pack.data, dest);
+                char buffer[sizeof(request)];
+                memset(buffer, 0, sizeof(request));
+                memcpy(buffer, &pack, sizeof(request));
+                if(send(sockfd, buffer, sizeof(request), 0) < 0){
+                    printf("Send failed");
+                    close(sockfd);
+                    return NULL;
+                }
+                file_dir pack2;
+                memset(&pack2, 0, sizeof(file_dir));
+                pack2.isFile=1;
+                strcpy(pack2.path,path);
+                FILE* file = fopen(path, "r");
+                if(file==NULL){
+                    printf("File not found");
+                    send_err_to_ns(clientSocket,"File not found");
+                    close(clientSocket);
+                    return NULL;
+                }
+                fseek(file, 0, SEEK_END);
+                long fsize = ftell(file);
+                char data[fsize+1];
+                memset(data, 0, fsize+1);
+                fseek(file, 0, SEEK_SET);
+                fread(data, 1, fsize, file);
+                strcpy(pack2.data, data);
+                char buffer1[sizeof(file_dir)];
+                memset(buffer1, 0, sizeof(file_dir));
+                memcpy(buffer1, &pack2, sizeof(file_dir));
+                if(send(sockfd, buffer1, sizeof(file_dir), 0) < 0){
+                    printf("Send failed");
+                    close(sockfd);
+                    return NULL;
+                }
+                printf("Sent\n");
+
+
+
+    }
         
+
    itemcount--;
 return NULL;
 }
@@ -608,7 +676,48 @@ void* NS_listener(void* arg){
     }
 
 }
+void* send_reg_path_to_ns(char * path)
+{
+    struct sockaddr_in serv_addr;
+    int sockfd;
+    // Create socket
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        printf("ERROR opening socket");
+        return NULL;
+    }
+    // Prepare server address by gethostbyname
+    struct hostent *server;
+    server = gethostbyname(NS_IP);
+    if (server == NULL) {
+        fprintf(stderr,"ERROR, no such host\n");
+        return NULL;
+    }
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
+    serv_addr.sin_port = htons(NS_PORT);
+    // Connect to naming server
+    if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
+        printf("ERROR connecting");
+        return NULL;
+    }
+    request pack;
+    pack.requestType = REGISTER_PATH;
+    strcpy(pack.data, path);
+    char buffer[sizeof(request)];
+    memset(buffer, 0, sizeof(request));
+    memcpy(buffer, &pack, sizeof(request));
+    if(send(sockfd, buffer, sizeof(request), 0) < 0){
+        printf("Send failed");
+        close(sockfd);
+        return NULL;
+    }
 
+   
+    
+    return NULL;
+}
 void get_permissions(mode_t mode, char *perm)
 {
     strcpy(perm, "----------");
@@ -801,7 +910,6 @@ void* handle_client_req(void* arg)
         char data[MAX_STRUCT_LENGTH-2];
         memset(data, 0, MAX_STRUCT_LENGTH - 2);
         size_t nread;
-        int count=0;
         while((nread = fread(data, 1, MAX_STRUCT_LENGTH, file)) > 0){
             request pack;
             pack.requestType = STREAM;
@@ -814,7 +922,6 @@ void* handle_client_req(void* arg)
                 close(clientSocket);
                 return NULL;
             }
-            count++;
             // memset(data, 0, MAX_STRUCT_LENGTH);
         }
         printf("Audio File sent successfully\n");
@@ -894,6 +1001,8 @@ void* handle_client_req(void* arg)
     {
         // get the current directory
         char cwd[MAX_PATH_LENGTH];
+        char src[MAX_PATH_LENGTH];
+        int cnt=0;
         memset(cwd, 0, MAX_PATH_LENGTH);
         getcwd(cwd, MAX_PATH_LENGTH);
         //hange the 
@@ -910,8 +1019,15 @@ void* handle_client_req(void* arg)
         int c;
         while((c = recv(clientSocket, buff2, sizeof(file_dir), 0)) > 0){
             memcpy(&pack, buff2, sizeof(buff2));
+            if (cnt==0)
+            {
+                strcpy(src,pack.path);
+                cnt++;
+            }
             if(pack.isFile == -10) {
                 printf("Folder pasted successfully\n");
+                printf("src: %s\n", src);
+                send_path_to_ns(src, req.data,1);
                 break;
             }
             if(pack.isFile==1)
@@ -925,7 +1041,8 @@ void* handle_client_req(void* arg)
                 }
                 fwrite(pack.data, 1, strlen(pack.data), file);
                 fclose(file);
-                send_path_to_ns(cwd, pack.path);
+                send_path_to_ns(req.data, pack.path,0);
+                // send_reg_path_to_ns(pack.path);
             }
             else
             {   
@@ -952,7 +1069,7 @@ void* handle_client_req(void* arg)
                    
                     return NULL;
                 }
-                else send_path_to_ns(cwd, pack.path);
+                else send_path_to_ns(req.data, pack.path,0);
             }
             memset(&pack, 0, sizeof(request));
             memset(buff2, 0, sizeof(request));
@@ -965,6 +1082,63 @@ void* handle_client_req(void* arg)
             close(clientSocket);
             return NULL;
         }
+    }
+    else if(req.requestType==PASTEFILE)
+    {
+        char cwd[MAX_PATH_LENGTH];
+        memset(cwd, 0, MAX_PATH_LENGTH);
+        getcwd(cwd, MAX_PATH_LENGTH);
+        //hange the 
+        if(chdir(req.data) < 0){
+            printf("Directory change failed");
+            send_err_to_ns(clientSocket,"Directory change failed");
+            close(clientSocket);
+            return NULL;
+        }
+        file_dir pack;
+        memset(&pack, 0, sizeof(request));
+        char buff2[sizeof(file_dir)];
+        memset(buff2, 0, sizeof(file_dir));
+        if(recv(clientSocket, buff2, sizeof(file_dir), 0) < 0){
+            printf("Receive failed");
+            send_err_to_ns(clientSocket,"Receive failed");
+            close(clientSocket);
+            return NULL;
+        }
+        memcpy(&pack, buff2, sizeof(file_dir));
+       
+    
+        char filename[MAX_PATH_LENGTH];
+        memset(filename, 0, MAX_PATH_LENGTH);
+        for(int i=strlen(pack.path)-1; i>=0; i--){
+            if(pack.path[i]!='/'){
+                char temp[2];
+                temp[0] = pack.path[i];
+                temp[1] = '\0';
+                strcat(filename, temp);
+            }
+            else{
+                break;
+            }
+        }
+        // reverse the filename
+        char temp[MAX_PATH_LENGTH];
+        memset(temp, 0, MAX_PATH_LENGTH);
+        for(int i=0;i<strlen(filename);i++){
+            temp[i] = filename[strlen(filename)-1-i];
+        }
+      FILE* file=  fopen(temp, "w");
+        fprintf(file, "%s", pack.data);
+        fclose(file);
+        send_path_to_ns(req.data, temp,0);
+        send_path_to_ns(pack.path, req.data,1);
+
+       if(chdir(cwd)<0){
+           printf("Directory change failed");
+           send_err_to_ns(clientSocket,"Directory change failed");
+           close(clientSocket);
+           return NULL;}
+        printf("File pasted successfully\n");
     }
 
     itemcount--;

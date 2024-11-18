@@ -62,14 +62,6 @@ while (1) {
     int len = sizeof(clientaddr);
     clientSockets[clientSocketID] = accept(sockfd, (struct sockaddr *)&clientaddr, (socklen_t*)&len);
 
-    //get port of client
-    struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&clientaddr;
-    struct in_addr ipAddr = pV4Addr->sin_addr;
-    char str[INET_ADDRSTRLEN];
-    inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
-    printf("Client IP: %s\n", str);
-
-
     if (clientSockets[clientSocketID] < 0) {
         perror("Client accept failed");
         continue;
@@ -87,6 +79,12 @@ while (1) {
         free(req);
         continue;
     }
+    char clientIP[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(clientaddr.sin_addr), clientIP, INET_ADDRSTRLEN);
+    char buffer2[sizeof(request)];
+    strcpy(buffer2, buffer);
+    buffer2[bytes_received] = '\0';
+    logrecvfrom("Client", clientIP, ntohs(clientaddr.sin_port), buffer2);
     memcpy(req, buffer, sizeof(request));
     printf("Received request from client on socket %d\n", clientSockets[clientSocketID]);
     processRequestStruct* prs = (processRequestStruct*)malloc(sizeof(processRequestStruct));
@@ -107,7 +105,7 @@ while (1) {
 }
 
 int main(int argc, char *argv[]) {
-        for(int i = 0; i < MAX_CLIENTS; i++)
+    for(int i = 0; i < MAX_CLIENTS; i++)
         clientSockets[i] = -1;
     printf("Starting naming server...\n");
 

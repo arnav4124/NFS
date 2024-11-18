@@ -1,6 +1,10 @@
 #ifndef COMMONHEADERS_H
 #define COMMONHEADERS_H
 
+#define _BSD_SOURCE
+
+#include <stdio.h>
+
 #define NAME_SERVER_PORT 8082
 
 typedef enum {
@@ -26,6 +30,8 @@ typedef enum {
    ERROR,
    ASYNC_WRITE_ACK,
    REGISTER_PATH,
+   REGISTER_PATH_STOP,
+   HEARTBEAT,
    STOP,
 } requestType;
 
@@ -54,5 +60,8 @@ typedef struct{
   char data[MAX_STRUCT_LENGTH];
   int clientID;
 } processRequestStruct;
+
+void logrecvfrom(char *from, char *ip, int port, char *buffer);
+void logsentto(char *to, char *ip, int port, char *buffer);
 
 #endif

@@ -33,7 +33,7 @@ typedef struct linked_list_node_struct {
 
 // Function prototypes
 struct trie_node *create_trie_node();
-int insert_path(struct trie_node *root, char *key,int ssid);
+int insert_path(struct trie_node *root, char *key, int ssid);
 int search_path(struct trie_node *root, char *key);
 int delete_path(struct trie_node *root, char *key);
 void print_paths(struct trie_node *root);

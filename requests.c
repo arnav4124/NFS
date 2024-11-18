@@ -1,10 +1,5 @@
 #include "./namingserver.h"
 
-//type determines whether this is storage server or client
-void logData(int type, int ss_id, char* ip, int port, processRequestStruct* req){
-
-}
-
 void insertWritePath(writePathNode** writePathsLL, int clientID, char* path){
     //insert in linked list at head
     pthread_mutex_lock(&writePathsLLMutex);
@@ -19,13 +14,13 @@ void insertWritePath(writePathNode** writePathsLL, int clientID, char* path){
     return;
 }
 
-int tryWritePath(writePathNode** writePathsLL, int clientID, char* path){
+int tryWritePath(writePathNode** writePathsLL, char* path){
     pthread_mutex_lock(&writePathsLLMutex);
     writePathNode* temp = *writePathsLL;
     while(temp != NULL){
-        if(strcmp(temp->path, path) == 0){
+        if(strcmp(temp->path, path) == 0 || strstr(temp->path, path) != NULL){
             //path already being written
-            printf("Path already being written\n");
+            // printf("Path already being written\n");
             pthread_mutex_unlock(&writePathsLLMutex);
             return 0;
         }
@@ -94,6 +89,18 @@ void sendMessageToClient(int clientSocket, requestType type, char* data){
     if(ch < 0){
         printf("Failed to send response to client");
     }
+    // struct sockaddr_in clientAddr;
+    // socklen_t addrLen = sizeof(clientAddr);
+    // if (getpeername(clientSocket, (struct sockaddr *)&clientAddr, &addrLen) == -1)
+    // {
+    //     perror("Failed to get client address");
+    //     return;
+    // }
+    // char clientIP[INET_ADDRSTRLEN];
+    // inet_ntop(AF_INET, &clientAddr.sin_addr, clientIP, INET_ADDRSTRLEN);
+    // int clientPort = ntohs(clientAddr.sin_port);
+    // logsentto("Client", clientIP, clientPort, buffer);
+
     return;
 }
 
@@ -136,7 +143,6 @@ int connectTo(int port, char* ip){
 }
 
 void connectToSS(StorageServer ss, int ssSocket){
-    // connect to the storage server
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(ss.ssPort);
@@ -161,7 +167,8 @@ void connectToSS(StorageServer ss, int ssSocket){
 
             if(size <= 0){
                 printf("Failed to receive paths from storage server\n");
-            } 
+            }
+            logrecvfrom("Storage Server", ss.ssIP, ss.ssPort, buffer);
 
             char* token = strtok(buffer, " ");
             pthread_mutex_lock(&storageServersList[i]->mutex);
@@ -179,7 +186,7 @@ void connectToSS(StorageServer ss, int ssSocket){
     return;
 }
 
-void handleCopying(processRequestStruct* req){
+void handleCopyingFolders(processRequestStruct* req){
     char path_source[MAX_PATH_LENGTH] = {0}, path_dest[MAX_PATH_LENGTH] = {0};
     char* token = strtok(req->data, " ");
     strcpy(path_source, token);
@@ -190,7 +197,24 @@ void handleCopying(processRequestStruct* req){
     if(ssid1 == -1 || ssid2 == -1){
         printf("Invalid paths provided\n");
         sendMessageToClient(clientSockets[req->clientID], ERROR, "Invalid paths provided");
+        return;
     }
+
+    //check if the folder path provided is a substring of any paths being written to. If yes, return error
+    writePathNode* temp = writePathsLL;
+    while(temp != NULL){
+        if(strstr(temp->path, path_source) != NULL){
+            printf("Path is already being written to\n");
+            sendMessageToClient(clientSockets[req->clientID], ERROR, "Path is already being written to");
+            return;
+        }
+        temp = temp->next;
+    }
+
+    // insert the path being written to so that no other client can write to it
+    insertWritePath(&writePathsLL, req->clientID, path_source);
+
+
     StorageServer* ss_source = storageServersList[ssid1], *ss_dest = storageServersList[ssid2];
 
     request req1;
@@ -206,9 +230,58 @@ void handleCopying(processRequestStruct* req){
     if(c1 < 0) {
         //later
     }
+    logsentto("Storage Server", ss_dest->ssIP, ss_dest->ssPort, data);
 
     printf("Copy request sent.\n");
     sendMessageToClient(clientSockets[req->clientID], ACK, "Copy started");
+    return;
+}
+
+void handleCopyingFiles(processRequestStruct* req){
+    char path_source[MAX_PATH_LENGTH] = {0}, path_dest[MAX_PATH_LENGTH] = {0};
+    char* token = strtok(req->data, " ");
+    strcpy(path_source, token);
+    token = strtok(NULL, " ");
+    strcpy(path_dest, token);
+    printf("Source: %s ", path_source);
+    printf("Dest: %s\n", path_dest);
+    int ssid1 = retrievePathIndex(path_source);
+    int ssid2 = retrievePathIndex(path_dest);
+
+
+    if(ssid1 == -1 || ssid2 == -1){
+        printf("Invalid paths provided\n");
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "Invalid paths provided");
+        return;
+    }
+
+    //check if file is already being written to
+    if(tryWritePath(&writePathsLL, path_dest) == 0){
+        sendMessageToClient(clientSockets[req->clientID], ERROR, "Path is already being written to");
+        return;
+    }
+    
+    insertWritePath(&writePathsLL, req->clientID, path_source);
+
+    StorageServer* ss_source = storageServersList[ssid1], *ss_dest = storageServersList[ssid2];
+
+    request req1;
+    memset(&req1, 0, sizeof(req1));
+    sprintf(req1.data, "%s %d %s %s",ss_dest->ssIP, ss_dest->clientPort, path_source, path_dest);
+    req1.requestType = COPYFILE;
+
+    int fd_source = connectTo(ss_source->ssPort, ss_source->ssIP);
+
+    char data[MAX_STRUCT_LENGTH] = {0};
+    memcpy(data, &req1, MAX_STRUCT_LENGTH);
+    int c1 = send(fd_source, data, MAX_STRUCT_LENGTH, 0);
+    if(c1 < 0) {
+        //later
+    }
+    logsentto("Storage Server", ss_dest->ssIP, ss_dest->ssPort, data);
+
+    printf("Copy request sent.\n");
+    sendMessageToClient(clientSockets[req->clientID], ACK, "Copy request sent");
 
 }
 
@@ -220,7 +293,7 @@ void handleClientSSRequests(processRequestStruct* req){
     printf("Path: %s\n", cr.path);  
 
     // check if path is already being written to
-    if(tryWritePath(&writePathsLL, req->clientID, req->data) == 0){
+    if(tryWritePath(&writePathsLL, req->data) == 0){
         sendMessageToClient(clientSockets[req->clientID], ERROR, "Path is already being written to");
         return;
     }
@@ -259,7 +332,7 @@ void handleDelete(processRequestStruct* req){
     strcpy(data, req->data);
 
     // check if path is already being written to
-    if(tryWritePath(&writePathsLL, req->clientID, req->data) == 0){
+    if(tryWritePath(&writePathsLL, req->data) == 0){
         sendMessageToClient(clientSockets[req->clientID], ERROR, "Path is already being written to");
         return;
     }
@@ -299,7 +372,6 @@ void handleDelete(processRequestStruct* req){
     memcpy(buffer, &reqq, sizeof(request));
 
     int ch = send(sockfd, buffer, sizeof(request), 0);
-
     if(ch < 0){
         printf("Failed to send request to storage server");
         ss->status = 0;
@@ -310,6 +382,7 @@ void handleDelete(processRequestStruct* req){
         close(sockfd);
         return;
     }
+    logsentto("Storage Server", ss->ssIP, ss->ssPort, buffer);
 
     char response[sizeof(request)];
 
@@ -325,6 +398,7 @@ void handleDelete(processRequestStruct* req){
         close(sockfd);
         return;
     }
+    logrecvfrom("Storage Server", ss->ssIP, ss->ssPort, response);
 
     request res;
     memset(&res, 0, sizeof(request));
@@ -380,14 +454,41 @@ void handleCreate(processRequestStruct* req){
     strcat(data, "/");
     strcat(data, token);
 
-    int checkPathIfPresent = retrievePathIndex(path);
-    StorageServer* ss = storageServersList[checkPathIfPresent];
+    StorageServer* ss;
+    int checkPathIfPresent;
 
-    if(checkPathIfPresent == -1){
-        printf("Path not found\n");
-        //sending this to client
-        sendMessageToClient(clientSockets[req->clientID], ERROR, "Path not found");
-        return;
+    if(strcmp(path, ".") == 0){
+        // choose the storage server with least number of paths
+        int min = 100000000;
+        int index = -1;
+
+        for(int i = 0; i < currentServerCount && storageServersList[i]->status == 1; i++){
+            pthread_mutex_lock(&storageServersList[i]->mutex);
+            if(storageServersList[i]->numberOfPaths < min){
+                min = storageServersList[i]->numberOfPaths;
+                index = i;
+            }
+            pthread_mutex_unlock(&storageServersList[i]->mutex);
+        }
+
+        if(index == -1){
+            printf("No storage server available\n");
+            //sending this to client
+            sendMessageToClient(clientSockets[req->clientID], ERROR, "No storage server available");
+            return;
+        }
+        ss = storageServersList[index];
+        checkPathIfPresent = index;
+    }
+    else {
+        checkPathIfPresent = retrievePathIndex(path);
+        if(checkPathIfPresent == -1){
+            printf("Path not found\n");
+            //sending this to client
+            sendMessageToClient(clientSockets[req->clientID], ERROR, "Path not found");
+            return;
+        }
+        ss = storageServersList[checkPathIfPresent];
     }
 
     // check if the file/folder already exists
@@ -421,8 +522,7 @@ void handleCreate(processRequestStruct* req){
     memset(buffer, 0, sizeof(buffer));
     memcpy(buffer, &reqq, sizeof(request));
 
-    int ch = send(sockfd, buffer, sizeof(request), 0);
-    
+    int ch = send(sockfd, buffer, sizeof(request), 0);    
     if(ch < 0){
         printf("Failed to send request to storage server");
         ss->status = 0;
@@ -433,12 +533,11 @@ void handleCreate(processRequestStruct* req){
         close(sockfd);
         return;
     }
+    logsentto("Storage Server", ss->ssIP, ss->ssPort, buffer);
 
     char response[sizeof(request)];
 
     int bytes_received = recv(sockfd, response, sizeof(response), 0);
-    
-
     if (bytes_received <= 0) {
         printf("Failed to receive response from storage server");
         ss->status = 0;
@@ -449,7 +548,8 @@ void handleCreate(processRequestStruct* req){
         close(sockfd);
         return;
     }
-    
+    logrecvfrom("Storage Server", ss->ssIP, ss->ssPort, response);
+
     request res; 
     memset(&res, 0, sizeof(request));
     memcpy(&res, response, sizeof(request));
@@ -458,7 +558,7 @@ void handleCreate(processRequestStruct* req){
         printf("File/Folder created successfully\n");
         // add path to the trie
         pthread_mutex_lock(&ss->mutex);
-        insert_path(ss->root, data, currentServerCount);
+        insert_path(ss->root, data, checkPathIfPresent);
         ss->numberOfPaths++;
         pthread_mutex_unlock(&ss->mutex);
 
@@ -541,13 +641,40 @@ void* processRequests(void* args){
         close(clientSockets[id]);
     }
     else if(req->requestType == COPYFOLDER){
-        handleCopying(req);
+        handleCopyingFolders(req);
+    }
+    else if(req->requestType == COPYFILE){
+        handleCopyingFiles(req);
     }
     else if(req->requestType == REGISTER_PATH){
         // insert the path in the trie
         char data[MAX_PATH_LENGTH];
         memset(data, 0, MAX_PATH_LENGTH);
-        clientSockets[req->clientID] = -1;
+        strcpy(data, req->data);
+        
+        char* token = strtok(data, " ");
+
+        int port = atoi(token);
+        char* path = strtok(NULL, " ");
+        printf("Registering path %s with port %d\n", path, port);
+
+        //find the ss with the port
+        for(int i = 0; i < currentServerCount && storageServersList[i]->status == 1; i++){
+            if(storageServersList[i]->ssPort == port){
+                pthread_mutex_lock(&storageServersList[i]->mutex);
+                insert_path(storageServersList[i]->root, path, i);
+                storageServersList[i]->numberOfPaths++;
+                pthread_mutex_unlock(&storageServersList[i]->mutex);
+                break;
+            }
+        }        
+    }
+    else if(req->requestType == REGISTER_PATH_STOP){
+        int id = removeWritePath(&writePathsLL, req->data);
+        printf("Path %s is no longer being written to\n", req->data);
+        sendMessageToClient(clientSockets[id], ACK, "Process Completed.");
+        clientSockets[id] = -1;
+        close(clientSockets[id]);
     }
     return NULL;
 }

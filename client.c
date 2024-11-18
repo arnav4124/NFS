@@ -4,37 +4,7 @@
 
 // #define TIMEOUT 1000
 
-// void *listenForWriteAck(void *arg)
-// {
-//     AckThreadArgs *args = (AckThreadArgs *)arg;
-//     int sockfd = args->sockfd;
-//     int *ack_received = args->ack_received;
-//     request ack_packet;
-//     ssize_t bytes_received = recv(sockfd, &ack_packet, sizeof(ack_packet), 0);
-//     if (bytes_received <= 0)
-//     {
-//         if (bytes_received < 0)
-//             perror("Error: recv() failed");
-//         *ack_received = 0;
-//     }
-//     else
-//     {
-//         if (ack_packet.requestType == ACK)
-//         {
-//             printf("Received acknowledgment from storage server: %s\n", ack_packet.data);
-//             *ack_received = 1;
-//             printf("ack value updated\n");
-//         }
-//         else
-//         {
-//             printf("Received unexpected response type: %d\n", ack_packet.requestType);
-//             *ack_received = 0;
-//         }
-//     }
-//     return NULL;
-// }
-
-void *listenForWriteAck(void *arg)
+void *listenForBackgroundAck(void *arg)
 {
     AckThreadArgs *args = (AckThreadArgs *)arg;
     int sockfd = args->sockfd;
@@ -61,9 +31,9 @@ void *listenForWriteAck(void *arg)
     {
         if (ack_packet.requestType == ACK)
         {
-            printf("\nReceived acknowledgment from storage server: %s\n", ack_packet.data);
+            printf("\nReceived acknowledgment from naming server: %s\n", ack_packet.data);
             *ack_received = 1;
-            printf("Write operation acknowledged by storage server\n");
+            printf("Operation acknowledged by naming server\n");
         }
         else
         {
@@ -174,7 +144,7 @@ int main(int argc, char* argv[]) {
         if (arg1[0] && arg2[0] && req.requestType != WRITESYNC && req.requestType != LIST) snprintf(req.data, MAX_STRUCT_LENGTH, "%s %s", arg1, arg2);
         else if (arg1[0] && req.requestType != LIST) snprintf(req.data, MAX_STRUCT_LENGTH, "%s", arg1);
         else req.data[0] = '\0';
-        printf("arg1: %s, arg2: %s\n", arg1, arg2);
+        // printf("arg1: %s, arg2: %s\n", arg1, arg2);
         printf("1RequestType: %d, Data: %s\n", req.requestType, req.data);
 
 
@@ -224,45 +194,55 @@ int main(int argc, char* argv[]) {
         printf("Received ACK from naming server. Data: %s\n", ns_ack.data);
         
 
+        if (req.requestType == COPYFILE || req.requestType == COPYFOLDER) goto COPY; 
 
-        request ns_response;
-        if (recv(sockfd, &ns_response, sizeof(ns_response), 0) < 0) {
-            perror("Error receiving response from naming server");
-            close(sockfd);
-            // exit(1);
-            continue;
-        }
-        if (req.requestType != WRITEASYNC) close(sockfd);
-        printf("Naming Server Response - RequestType: %d, \nData: %s\n", ns_response.requestType, ns_response.data);
+            request ns_response;
+            if (recv(sockfd, &ns_response, sizeof(ns_response), 0) < 0) {
+                perror("Error receiving response from naming server");
+                close(sockfd);
+                // exit(1);
+                continue;
+            }
+            if (req.requestType != WRITEASYNC && req.requestType != COPYFILE && req.requestType != COPYFOLDER) close(sockfd);
+            printf("Naming Server Response - RequestType: %d, \nData: %s\n", ns_response.requestType, ns_response.data);
 
-        if (ns_response.requestType == ERROR) {
-            printf("Error: %s\n", ns_response.data);
-            continue;
-        }
-        printf("2RequestType: %d, Data: %s\n", req.requestType, req.data);
+            if (ns_response.requestType == ERROR) {
+                printf("Error: %s\n", ns_response.data);
+                continue;
+            }
+            printf("2RequestType: %d, Data: %s\n", req.requestType, req.data);
 
-        if (req.requestType == LIST) {
-            printf("printed list items above");
-            continue;
-        }    
-        
-        char storage_server_ip[MAX_IPOP_LENGTH], storage_server_port[MAX_IPOP_LENGTH];
-        memset(storage_server_ip, 0, sizeof(storage_server_ip));
-        memset(storage_server_port, 0, sizeof(storage_server_port));
-        if (sscanf(ns_response.data, "%s %s", storage_server_ip, storage_server_port) != 2) {
-            printf("Error: Invalid response from naming server.\n");
-            continue;
-        }
-        printf("Storage Server IP: %s, Port: %s\n", storage_server_ip, storage_server_port);
-        fflush(stdout);
+            if (req.requestType == LIST) {
+                // printf("printed list items above");
+                continue;
+            }    
+            
+            char storage_server_ip[MAX_IPOP_LENGTH], storage_server_port[MAX_IPOP_LENGTH];
+            memset(storage_server_ip, 0, sizeof(storage_server_ip));
+            memset(storage_server_port, 0, sizeof(storage_server_port));
+            if (sscanf(ns_response.data, "%s %s", storage_server_ip, storage_server_port) != 2) {
+                printf("Error: Invalid response from naming server.\n");
+                continue;
+            }
+            // printf("Storage Server IP: %s, Port: %s\n", storage_server_ip, storage_server_port);
+            fflush(stdout);
 
+            COPY:
 
-        printf("operation: %s\n", operation);
+        // printf("operation: %s\n", operation);
         if (strcmp(operation, "CREATEFILE") == 0 || strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "DELETEFILE") == 0 || strcmp(operation, "DELETEFOLDER") == 0 || strcmp(operation, "COPY") == 0) {
             continue;
         }
+        else if (strcmp(operation, "COPYFILE") == 0 || strcmp(operation, "COPYFOLDER") == 0) {
+            int ack_received = 0;
+            pthread_t ack_thread;
+            AckThreadArgs thread_args = {.sockfd = sockfd, .ack_received = &ack_received};
+            pthread_create(&ack_thread, NULL, listenForBackgroundAck, (void *)&thread_args);
+            printf("COPY FILE/FOLDER operation sent - acknowledgment will be received in background\n");
+            continue;
+        }
 
-        printf("Connecting to storage server...\n");    
+        // printf("Connecting to storage server...\n");    
 
         int ss_sockfd = socket(AF_INET, SOCK_STREAM, 0);
         if (ss_sockfd < 0) {
@@ -332,7 +312,7 @@ int main(int argc, char* argv[]) {
                 }
             }
             if (send_write_flag == 0) continue;
-            printf("Sending stop\n");
+            // printf("Sending stop\n");
             request ss_send;
             ss_send.requestType = STOP;
             memset(ss_send.data, 0, sizeof(ss_send.data));
@@ -345,9 +325,9 @@ int main(int argc, char* argv[]) {
                 // exit(EXIT_FAILURE);
                 continue;
             }
-            printf("Write operation complete.\n");
+            // printf("Write operation complete.\n");
         }
-        printf("Request sent to storage server.\n");
+        // printf("Request sent to storage server.\n");
 
 
         if (req.requestType == STREAM) {
@@ -378,13 +358,12 @@ int main(int argc, char* argv[]) {
             printf("Starting READ operation...\n");
             while ((bytes_received = recv(ss_sockfd, &ss_response, sizeof(ss_response), 0)) > 0)
             {
-                // buffer[bytes_received] = '\0'; 
                 printf("%s", ss_response.data);
             }
             if (bytes_received < 0)
                 perror("Error receiving data for READ request");
-            else
-                printf("READ operation completed, no more data.\n");
+            // else
+            //     printf("READ operation completed, no more data.\n");
             close(ss_sockfd);
         }
         else {
@@ -400,7 +379,7 @@ int main(int argc, char* argv[]) {
                 int ack_received = 0;
                 pthread_t ack_thread;
                 AckThreadArgs thread_args = {.sockfd = sockfd, .ack_received = &ack_received};
-                pthread_create(&ack_thread, NULL, listenForWriteAck, (void *)&thread_args);
+                pthread_create(&ack_thread, NULL, listenForBackgroundAck, (void *)&thread_args);
                 printf("Write operation sent - acknowledgment will be received in background\n");
                 continue;
             }

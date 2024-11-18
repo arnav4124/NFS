@@ -16,8 +16,8 @@ all : client nm 1ss 2ss
 client : client.c client.h 
 	$(CC) $(CFLAGS) client.c -o client
 
-nm : namingserver.c trie.c requests.c lru.c lru.h trie.h requests.h namingserver.h
-	$(CC) $(CFLAGS) namingserver.c trie.c requests.c lru.c -o nm
+nm : namingserver.c trie.c requests.c lru.c log.c lru.h trie.h requests.h namingserver.h 
+	$(CC) $(CFLAGS) namingserver.c trie.c requests.c lru.c log.c -o nm
 
 1ss: storageserver.c ss_functions.c lru.c lru.h ss_functions.h storageserver.h 
 	$(CC) $(CFLAGS) storageserver.c ss_functions.c lru.c -o 1ss -DPORT=8086
