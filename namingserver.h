@@ -27,6 +27,7 @@
 #define MAX_CLIENTS 1000
 
 extern int clientSockets[MAX_CLIENTS];
+extern pthread_mutex_t clientSocketsLock;
 
 typedef struct {
   char ssIP[20];

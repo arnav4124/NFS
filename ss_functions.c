@@ -699,10 +699,49 @@ void* NS_listener(void* arg){
         *clientSocket = accept(ns_sockfd, (struct sockaddr *)&clientaddr, (socklen_t*)&len);
         if(*clientSocket < 0){
             printf("Client accept failed");
+            switch (errno)
+            {
+            case EBADF:
+                printf("The argument sockfd is not a valid file descriptor.\n");
+                break;
+            case EFAULT:
+                printf("The address pointed to by addr is not a valid part of the process address space.\n");
+                break;
+            case EINVAL:
+                printf("The socket is not accepting connections.\n");
+                break;
+            case ENOTSOCK:
+                printf("The file descriptor sockfd does not refer to a socket.\n");
+                break;
+            case EOPNOTSUPP:
+                printf("The socket is not of type that supports the accept() operation.\n");
+                break;
+            case EWOULDBLOCK:
+                printf("The socket is marked non-blocking and no connections are present to be accepted.\n");
+                break;
+            case ECONNABORTED:
+                printf("A connection has been aborted.\n");
+                break;
+            case EINTR:
+                printf("The system call was interrupted by a signal that was caught.\n");
+                break;
+            case EPROTO:
+                printf("Protocol error.\n");
+                break;
+            case EPERM:
+                printf("Firewall rules forbid connection.\n");
+                break;
+            default:
+                printf("Unknown error\n");
+                break;
+            }
+            
             close(ns_sockfd);
             return NULL;
         }
-        // printf("Client connected\n");
+
+        printf("Client connected on socket %d\n", *clientSocket);
+
         // handle the client request
         pthread_t tid;
         pthread_create(&tid, NULL, handle_ns_req, clientSocket);
@@ -1228,13 +1267,13 @@ void * Client_listner(void * arg)
 
         int* clientSocket = (int*)malloc(sizeof(int));
         *clientSocket = accept(sockfd, (struct sockaddr *)&clientaddr, (socklen_t*)&len);
-        printf("New client connected\n");
         if(*clientSocket < 0){
             printf("Client accept failed");
             free(clientSocket);
             // close(sockfd);
             // return NULL;
         }
+        printf("New client connected\n");
         // handle the client request
         pthread_t tid;
         pthread_create(&tid, NULL, handle_client_req, clientSocket);

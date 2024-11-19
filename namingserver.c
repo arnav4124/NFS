@@ -6,6 +6,8 @@ int serverPorts = 8082;
 StorageServer* storageServersList[MAX_SERVERS];
 int currentServerCount = 0;
 int sockfdMaster;
+
+
 int clientSockets[MAX_CLIENTS];
 
 LRUList* lruCache;
@@ -13,12 +15,17 @@ LRUList* lruCache;
 writePathNode* writePathsLL;
 pthread_mutex_t writePathsLLMutex;
 
+pthread_mutex_t clientSocketsLock = PTHREAD_MUTEX_INITIALIZER;
+
 int findFreeClientSocketIndex() {
+    pthread_mutex_lock(&clientSocketsLock);
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clientSockets[i] == -1) {
+            pthread_mutex_unlock(&clientSocketsLock);
             return i;
         }
     }
+    pthread_mutex_unlock(&clientSocketsLock);
     return -1;
 }
 

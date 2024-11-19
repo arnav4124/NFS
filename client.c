@@ -26,6 +26,7 @@ void *listenForBackgroundAck(void *arg)
     }
 
     request ack_packet;
+    memset(ack_packet.data, 0, sizeof(ack_packet.data));
     ssize_t bytes_received = recv(sockfd, &ack_packet, sizeof(ack_packet), 0);
     if (bytes_received <= 0)
     {
@@ -39,6 +40,7 @@ void *listenForBackgroundAck(void *arg)
         {
             // printf(GREEN "\nReceived acknowledgment from naming server: %s\n" RESET, ack_packet.data);
             printf(GREEN "%s\n" RESET, ack_packet.data);
+            fflush(stdout);
             *ack_received = 1;
             // printf("Operation acknowledged by naming server\n");
         }
@@ -48,11 +50,12 @@ void *listenForBackgroundAck(void *arg)
             // printf("Received response data: %s\n", ack_packet.data);
             printf(RED "%s" RESET, ack_packet.data);
             printf("\n");
+            fflush(stdout);
             *ack_received = 0;
         }
     }
     // printf("\033[0G\n"); 
-    fflush(stdout);
+    // fflush(stdout);
     close(sockfd);
     return NULL;
 }
@@ -91,6 +94,7 @@ requestType getRequestType(const char* operation) {
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         printf(CYAN "Usage: %s <naming server ip>\n" RESET, argv[0]);
+        fflush(stdout);
         exit(1);
     }
     char* nsip = argv[1];
@@ -98,9 +102,11 @@ int main(int argc, char* argv[]) {
     char input[MAX_NAME_LENGTH];
     char operation[MAX_IPOP_LENGTH], arg1[MAX_PATH_LENGTH], arg2[MAX_PATH_LENGTH];
     printf(CYAN "...............Client starting.............\n" RESET);
+    fflush(stdout);
 
     while (1) {
         printf(CYAN "Enter Command: " RESET); ;
+        fflush(stdout);
         if (!fgets(input, sizeof(input), stdin)) {
             fprintf(stderr, "Error reading input.\n");
             continue;
@@ -112,10 +118,12 @@ int main(int argc, char* argv[]) {
         char* token = strtok(input, " ");
         if (token == NULL) {
             printf(RED "Error: No operation provided.\n" RESET);
+            fflush(stdout);
             continue;
         }
         if (strcmp(token, "EXIT") == 0) {
             printf(CYAN "Exiting client...\n" RESET);
+            fflush(stdout);
             break;
         }
         strncpy(operation, token, MAX_IPOP_LENGTH);
@@ -131,6 +139,7 @@ int main(int argc, char* argv[]) {
         req.requestType = getRequestType(operation);
         if (!(strcmp(operation, "READ") == 0 || strcmp(operation, "WRITESYNC") == 0 || strcmp(operation, "WRITEASYNC") == 0 || strcmp(operation, "CREATEFILE") == 0 || strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "DELETEFILE") == 0 || strcmp(operation, "DELETEFOLDER") == 0 || strcmp(operation, "COPYFILE") == 0 || strcmp(operation, "COPYFOLDER") == 0 || strcmp(operation, "LIST") == 0 || strcmp(operation, "INFO") == 0 || strcmp(operation, "STREAM") == 0 || strcmp(operation, "EXIT") == 0)) {
             printf(RED "Error: Unrecognized operation.\n" RESET);
+            fflush(stdout);
             continue;
         }
         else if (strcmp(operation, "COPYFILE") == 0 || strcmp(operation, "COPYFOLDER") == 0 || strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "CREATEFILE") == 0) {
@@ -142,10 +151,12 @@ int main(int argc, char* argv[]) {
         }
         if (!(req.requestType == LIST) && !arg1[0]) {
             printf(RED "Error: Invalid format, missing primary argument.\n" RESET);
+            fflush(stdout);
             continue;
         }
         if ((strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "CREATEFILE") == 0 || strcmp(operation, "COPYFILE") == 0 || strcmp(operation, "COPYFOLDER") == 0) && !arg2[0]) {
             printf(RED "Error: Missing second argument for %s operation.\n" RESET, operation);
+            fflush(stdout);
             continue;
         }
         if (arg1[0] && arg2[0] && req.requestType != WRITESYNC && req.requestType != LIST) snprintf(req.data, MAX_STRUCT_LENGTH, "%s %s", arg1, arg2);
@@ -187,6 +198,7 @@ int main(int argc, char* argv[]) {
         }
 
         request ns_ack;
+        memset(ns_ack.data, 0, sizeof(ns_ack.data));
         if (recv(sockfd, &ns_ack, sizeof(ns_ack), 0) < 0) {
             perror(RED "Error receiving response from naming server\n" RESET);
             close(sockfd);
@@ -195,6 +207,7 @@ int main(int argc, char* argv[]) {
         
         if (ns_ack.requestType != ACK) {
             printf(RED "Error: Unexpected response from naming server. RequestType: %d\n" RESET, ns_ack.requestType);
+            fflush(stdout);
             close(sockfd);
             continue;
         }
@@ -204,6 +217,7 @@ int main(int argc, char* argv[]) {
         if (req.requestType == COPYFILE || req.requestType == COPYFOLDER) goto COPY; 
 
         request ns_response;
+        memset(ns_response.data, 0, sizeof(ns_response.data));
         if (recv(sockfd, &ns_response, sizeof(ns_response), 0) < 0) {
             perror(RED "Error receiving response from naming server\n" RESET);
             close(sockfd);
@@ -215,10 +229,12 @@ int main(int argc, char* argv[]) {
         // printf(CYAN "%s\n" RESET, ns_response.data);
         if (ns_response.requestType == ERROR || req.requestType == LIST) {
             printf(CYAN "%s\n" RESET, ns_response.data);
+            memset(ns_response.data, 0, sizeof(ns_response.data));
+            fflush(stdout);
             continue;
         }
         // printf("2RequestType: %d, Data: %s\n", req.requestType, req.data);
-        printf(CYAN "%s\n" RESET, req.data);
+        // printf(CYAN "%s\n" RESET, req.data);
         if (req.requestType == LIST) {
             // printf("printed list items above");
             continue;
@@ -231,12 +247,14 @@ int main(int argc, char* argv[]) {
         if (req.requestType == READ) {
             if (sscanf(ns_response.data, "%s %s %s", storage_server_ip, storage_server_port, readpath) != 3) {
                 printf(RED "Error: Invalid response from naming server.\n" RESET);
+                fflush(stdout);
                 continue;
             }
         }
         else {
             if (sscanf(ns_response.data, "%s %s", storage_server_ip, storage_server_port) != 2) {
                 printf(RED "Error: Invalid response from naming server.\n" RESET);
+                fflush(stdout);
                 continue;
             }
         }
@@ -245,10 +263,10 @@ int main(int argc, char* argv[]) {
             memset(req.data, 0, sizeof(req.data));
             strcpy(req.data, readpath);
         }
-        printf("%s\n", readpath);
+        // printf("%s\n", readpath);
 
         // printf("Storage Server IP: %s, Port: %s\n", storage_server_ip, storage_server_port);
-        fflush(stdout);
+        // fflush(stdout);
         COPY:
 
         // printf("operation: %s\n", operation);
@@ -301,6 +319,7 @@ int main(int argc, char* argv[]) {
         {
             printf(CYAN "Enter content to write (type 2 consecutive enters to stop):\n" RESET);
             char buffer[10];
+            memset(buffer, 0, sizeof(buffer));
             int consecutive_newlines = 0;
             ssize_t bytes_sent;
             while (1)
@@ -376,13 +395,15 @@ int main(int argc, char* argv[]) {
         }
         else if (req.requestType == READ) {
             request ss_response;
+            memset(ss_response.data, 0, sizeof(ss_response.data));
             ssize_t bytes_received;
             // printf("Starting READ operation...\n");
             while ((bytes_received = recv(ss_sockfd, &ss_response, sizeof(ss_response), 0)) > 0)
             {
-                if (req.requestType != ACK) printf("%s", ss_response.data);
+                if (req.requestType != ACK && strcmp(ss_response.data, "File data sent successfully") != 0) printf("%s", ss_response.data);
             }
             printf("\n");
+            fflush(stdout);
             if (bytes_received < 0)
                 perror(RED "Error receiving data for READ request\n" RESET);
             // else
@@ -391,6 +412,7 @@ int main(int argc, char* argv[]) {
         }
         else {
             request ss_response;
+            memset(ss_response.data, 0, sizeof(ss_response.data));
             if (recv(ss_sockfd, &ss_response, sizeof(ss_response), 0) < 0) {
                 perror(RED "Error receiving response from storage server\n" RESET);
                 close(ss_sockfd);
@@ -398,6 +420,7 @@ int main(int argc, char* argv[]) {
             }          
             // printf("Storage Server Response - RequestType: %d, Data: %s\n", ss_response.requestType, ss_response.data);
             printf(CYAN "%s\n" RESET, ss_response.data);
+            fflush(stdout);
             if (req.requestType == WRITEASYNC)
             {
                 int ack_received = 0;

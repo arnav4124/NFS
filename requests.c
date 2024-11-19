@@ -1,4 +1,11 @@
 #include "./namingserver.h"
+
+void removeFromClientSocket(int clientSocket){
+    pthread_mutex_lock(&clientSocketsLock);
+    close(clientSockets[clientSocket]);
+    clientSockets[clientSocket] = -1;
+    pthread_mutex_unlock(&clientSocketsLock);
+}
 int getSSIDFromPort(int port){
     for(int i = 0; i < currentServerCount; i++){
         if(storageServersList[i]->ssPort == port){
@@ -1032,28 +1039,24 @@ void* processRequests(void* args){
         memcpy(&ss, req->data, sizeof(StorageServer));
         printf("Connecting to storage server %s:%d\n", ss.ssIP, ss.ssPort);
         connectToSS(ss, clientSockets[req->clientID]);
-        close(clientSockets[req->clientID]);
-        clientSockets[req->clientID] = -1;
+        removeFromClientSocket(req->clientID);
         free(req);
     }
     else if(req->requestType == CREATEFOLDER || req->requestType == CREATEFILE){
         // create file
         handleCreate(req);
-        close(clientSockets[req->clientID]);
-        clientSockets[req->clientID] = -1;
+        removeFromClientSocket(req->clientID);
         free(req);
     }
     else if(req->requestType == DELETEFOLDER || req->requestType == DELETEFILE){
         // delete file
         handleDelete(req);
-        close(clientSockets[req->clientID]);
-        clientSockets[req->clientID] = -1;
+        removeFromClientSocket(req->clientID);
         free(req);        
     }
     else if(req->requestType == WRITESYNC ||  req->requestType == READ || req->requestType == INFO || req->requestType == STREAM){
         handleClientSSRequests(req); 
-        close(clientSockets[req->clientID]);
-        clientSockets[req->clientID] = -1;
+        removeFromClientSocket(req->clientID);
         free(req);
     }
     else if(req->requestType == WRITEASYNC ){
@@ -1062,8 +1065,7 @@ void* processRequests(void* args){
     }
     else if(req->requestType == LIST){
         listAllPaths(req);
-        close(clientSockets[req->clientID]);
-        clientSockets[req->clientID] = -1;
+        removeFromClientSocket(req->clientID);
         free(req);
     }
     else if(req->requestType == ACK){
@@ -1072,8 +1074,7 @@ void* processRequests(void* args){
         memset(data, 0, MAX_PATH_LENGTH);
         strcpy(data, req->data);
         removeWritePath(&writePathsLL, data);
-        close(clientSockets[req->clientID]);
-        clientSockets[req->clientID] = -1;
+        removeFromClientSocket(req->clientID);
         free(req);
     }
     else if(req->requestType == WRITE_ACK){
@@ -1096,8 +1097,8 @@ void* processRequests(void* args){
         removeWritePath(&writePathsLL, data);
         backup(temp->portNumber, getSSIDFromPort(temp->portNumber), data, COPYFILE);
 
-        close(clientSockets[req->clientID]);
-        clientSockets[req->clientID] = -1;
+        removeFromClientSocket(req->clientID);
+
         free(req);
     }
     else if(req->requestType == COPYFOLDER){
@@ -1129,8 +1130,8 @@ void* processRequests(void* args){
             }
         }    
 
-        close(clientSockets[req->clientID]);
-        clientSockets[req->clientID] = -1;    
+        removeFromClientSocket(req->clientID);
+
         free(req);
     }
     else if(req->requestType == REGISTER_PATH_STOP_FILE){
@@ -1144,10 +1145,8 @@ void* processRequests(void* args){
 
         int id = temp1->clientID;
         sendMessageToClient(clientSockets[id], ACK, "Process Completed.");
-        close(clientSockets[id]);
-        clientSockets[id] = -1;
-        close(clientSockets[req->clientID]);
-        clientSockets[req->clientID] = -1;
+        removeFromClientSocket(id);
+        removeFromClientSocket(req->clientID);
 
         writePathNode* temp = findWritePath(&writePathsLL, req->data);
         backup(temp->portNumber, getSSIDFromPort(temp->portNumber), temp->dest_path, COPYFILE);
@@ -1165,10 +1164,8 @@ void* processRequests(void* args){
         int id = temp1->clientID;
 
         sendMessageToClient(clientSockets[id], ACK, "Process Completed.");
-        close(clientSockets[id]);
-        clientSockets[id] = -1;
-        close(clientSockets[req->clientID]);
-        clientSockets[req->clientID] = -1;
+        removeFromClientSocket(id);
+        removeFromClientSocket(req->clientID);
 
         writePathNode* temp = findWritePath(&writePathsLL, req->data);
         backup(temp->portNumber, getSSIDFromPort(temp->portNumber), temp->dest_path, COPYFOLDER);        
@@ -1182,9 +1179,6 @@ void* heartbeat(void* arg)
     while(1){
         sleep(5);
         int sockfd = connectTo(ss->ssPort, ss->ssIP);
-        struct timeval timeout;      
-        timeout.tv_sec = 10;
-        timeout.tv_usec = 0;
         if(sockfd < 0){
             pthread_mutex_lock(&ss->mutex);
             printf("Storage server %s:%d is down\n", ss->ssIP, ss->ssPort);
