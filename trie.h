@@ -6,8 +6,6 @@
 #include <string.h>
 #include "./commonheaders.h"
 
-#define ERROR_MSG(string) "\033[1;31m" string "\033[0m"
-
 // Trie node structure
 typedef struct Node {
     char *path_fragment;
@@ -33,7 +31,6 @@ TrieNode *initialize_node();
 int add_path(TrieNode *root, const char *path, int id);
 int find_path(TrieNode *root, const char *path);
 int remove_path(TrieNode *root, const char *path);
-void display_paths(TrieNode *root);
 PathList *initialize_path_list();
 PathNode *initialize_path_node(const char *path);
 void append_to_list(PathList *list, const char *path);

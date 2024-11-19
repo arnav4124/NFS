@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <pthread.h>
 
-#define MAX_LRU_SIZE 2
+#define MAX_LRU_SIZE 10
 
 typedef struct LRUNode LRUNode;
 
@@ -31,5 +31,5 @@ void dequeueLRU(LRUList **list);
 int retrieveLRU(LRUList **list, const char *path);
 void removeFromLRU(LRUList **list, const char *path);
 void printLRUList(LRUList **list);
-
+void removefromLRUBySSID(LRUList **list, const int ssid);
 #endif

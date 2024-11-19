@@ -13,7 +13,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#define MAX_CLIENTS 10
+#define MAX_CLIENTS 1000
+
 
 // Function declarations
 void* handle_ns_req(void* arg);

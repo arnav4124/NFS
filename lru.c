@@ -117,6 +117,38 @@ void removeFromLRU(LRUList **list, const char *path) {
     pthread_mutex_unlock(&((*list)->mutex));
     return;
 }
+void removefromLRUBySSID(LRUList **list, const int ssid) {
+    if (list == NULL || (*list) == NULL) {
+        return;
+    }
+    pthread_mutex_lock(&((*list)->mutex));
+    LRUNode *current = (*list)->head;
+    LRUNode *prev = NULL;
+    while (current != NULL) {
+        if (current->ssid == ssid) {
+            if (prev != NULL) {
+                prev->next = current->next;
+                if (current == (*list)->tail) {
+                    (*list)->tail = prev;
+                }
+                free(current);
+            } else {
+                (*list)->head = current->next;
+                if (current == (*list)->tail) {
+                    (*list)->tail = NULL;
+                }
+                free(current);
+            }
+            (*list)->numLRU--;
+            // pthread_mutex_unlock(&((*list)->mutex));
+            // return;
+        }
+        prev = current;
+        current = current->next;
+    }
+    pthread_mutex_unlock(&((*list)->mutex));
+    return;
+}
 
 int retrieveLRU(LRUList **list, const char *path) {
     if (list == NULL || (*list) == NULL) { 

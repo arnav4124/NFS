@@ -7,7 +7,44 @@
 #include "./lru.h"
 
 #define CLIENT_PORT PORT+1
+void* send_write_ack_to_ns(char* filename)
+{
+    int sockfd;
+    struct sockaddr_in serv_addr;
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        printf("ERROR opening socket");
+        return NULL;
+    }
+    struct hostent *server;
+    server = gethostbyname(NS_IP);
+    if (server == NULL) {
+        fprintf(stderr,"ERROR, no such host\n");
+        return NULL;
+    }
 
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
+    serv_addr.sin_port = htons(NS_PORT);
+    if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
+        printf("ERROR connecting");
+        return NULL;
+    }
+    request pack;
+    pack.requestType = WRITE_ACK;
+    strcpy(pack.data, filename);
+    char buffer[sizeof(request)];
+    memset(buffer, 0, sizeof(request));
+    memcpy(buffer, &pack, sizeof(request));
+    if(send(sockfd, buffer, sizeof(request), 0) < 0){
+        printf("Send failed");
+        close(sockfd);
+        return NULL;
+    }
+    return NULL;
+
+}
 void* send_err_to_ns(int Socket,char *msg)
 {
     request pack;
@@ -73,6 +110,10 @@ void* fts_search( char* arg,int clientSocket,char* dest)
                     }
                     strcpy(pack.path,node->fts_path);
                     strcpy(pack.name,node->fts_name);
+                    // if file path has .wav then break
+                    if(strstr(node->fts_name, ".wav") != NULL){
+                        break;
+                    }
                     if(pack.isFile==1)
                     {
                         FILE* file = fopen(node->fts_path, "r");
@@ -138,6 +179,7 @@ void* fts_search( char* arg,int clientSocket,char* dest)
         close(clientSocket);
         return NULL;
     }
+    printf("Send success\n");
     return 0;
 }
 
@@ -176,7 +218,7 @@ void* writeAsync(void* args){
     sprintf(str, "%s", t->path);
 
     request pack;
-    pack.requestType = ASYNC_WRITE_ACK;
+    pack.requestType = WRITE_ACK;
     strcpy(pack.data, str);
     char buffer[sizeof(request)];
     memset(buffer, 0, sizeof(request));
@@ -302,7 +344,8 @@ void* send_path_to_ns(char* cwd, char* path,int fl)
     request pack;
     pack.requestType = REGISTER_PATH;
     if(fl) {
-        pack.requestType=REGISTER_PATH_STOP;
+      if(fl==1)  pack.requestType=REGISTER_PATH_STOP_FOLDER;
+        else pack.requestType=REGISTER_PATH_STOP_FILE;
         // char port[10];
    
     strcpy(pack.data,cwd);
@@ -417,7 +460,7 @@ void * handle_ns_req(void* arg){
     request req;
     memset(&req, 0, sizeof(request));
     memcpy(&req, buffer, sizeof( request));
-    printf("Received request from naming server\n");
+    // printf("Received request from naming server\n");
     // check the request type
     if(req.requestType==CREATEFOLDER)
     {
@@ -492,8 +535,8 @@ void * handle_ns_req(void* arg){
     
     else if (req.requestType==COPYFOLDER)
     {
-           char ip[20];
-              char port[20];
+                char ip[20];
+                char port[20];
                 char path[100];
                 char dest[100];
                 char *tok = strtok(req.data, " ");
@@ -504,11 +547,10 @@ void * handle_ns_req(void* arg){
                 strcpy(path, tok);
                 tok = strtok(NULL, " ");
                 strcpy(dest, tok);
-                printf("dest: %s\n", dest);
+               
                 int portno=atoi(port);
-                printf("IP: %s\n", ip);
-                printf("Port: %d\n", portno);
-                printf("Path: %s\n", path);
+               
+                printf("Ip %s Port %d Path %s Dest %s\n",ip,portno,path,dest);
                 int sockfd = socket(AF_INET, SOCK_STREAM, 0);
                 if (sockfd < 0) {
                     printf("ERROR opening socket");
@@ -530,7 +572,7 @@ void * handle_ns_req(void* arg){
                     return NULL;
                 }
                 // printf("Connected to naming server\n");
-                printf("Calling fts_search\n");
+                // printf("Calling fts_search\n");
                 fts_search(path,sockfd,dest);
     }
     else if(req.requestType==COPYFILE)
@@ -617,6 +659,7 @@ void * handle_ns_req(void* arg){
         
 
    itemcount--;
+   free(arg);
 return NULL;
 }
 
@@ -653,22 +696,23 @@ void* NS_listener(void* arg){
         struct sockaddr_in clientaddr;
         int len = sizeof(clientaddr);
 
-        int clientSocket = accept(ns_sockfd, (struct sockaddr *)&clientaddr, (socklen_t*)&len);
-        if(clientSocket < 0){
+        int* clientSocket = (int*)malloc(sizeof(int));
+        *clientSocket = accept(ns_sockfd, (struct sockaddr *)&clientaddr, (socklen_t*)&len);
+        if(*clientSocket < 0){
             printf("Client accept failed");
             close(ns_sockfd);
             return NULL;
         }
-        printf("Client connected\n");
+        // printf("Client connected\n");
         // handle the client request
-        if(itemcount<MAX_CLIENTS){
+        if(1){
             pthread_t tid;
             itemcount++;
-            pthread_create(&tid, NULL, handle_ns_req, &clientSocket);
+            pthread_create(&tid, NULL, handle_ns_req, clientSocket);
         }
         else{
             printf("Server is full\n");
-            close(clientSocket);
+            close(*clientSocket);
         }
         
     }
@@ -768,7 +812,7 @@ void* handle_client_req(void* arg)
     memset(&req, 0, sizeof( request));
     memcpy(&req, buffer, sizeof( request));
     printf("Received request from client\n");
-    printf("Request type: %d\n", req.requestType);
+    printf("\nRequest type: %d, Request data: %s\n", req.requestType, req.data);
     // check the request type
     if(req.requestType==READ){
         char command[MAX_STRUCT_LENGTH];
@@ -849,7 +893,7 @@ void* handle_client_req(void* arg)
         request client_ack;
         memset(&client_ack, 0, sizeof(request));
         client_ack.requestType = req.requestType;
-        snprintf(client_ack.data, sizeof(client_ack.data), "ACK1 for WRITEASYNC");
+        snprintf(client_ack.data, sizeof(client_ack.data), "WRITEASYNC Started");
         if (send(clientSocket, &client_ack, sizeof(client_ack), 0) < 0) 
             perror("Error sending acknowledgment");
         else
@@ -894,8 +938,9 @@ void* handle_client_req(void* arg)
         fflush(file);
         fclose(file);
         printf("File written successfully\n");
-        send_ack_to_ns(clientSocket,"File written successfully");
-        send_unlock_ack_to_ns(filename);
+        // send_ack_to_ns(clientSocket,"File written successfully");
+        // send_unlock_ack_to_ns(filename);
+        send_write_ack_to_ns(filename);
     }
     else if(req.requestType==STREAM){
           FILE*  file = fopen(req.data, "rb");
@@ -1003,13 +1048,14 @@ void* handle_client_req(void* arg)
         int cnt=0;
         memset(cwd, 0, MAX_PATH_LENGTH);
         getcwd(cwd, MAX_PATH_LENGTH);
+        printf("req.data: %s\n", req.data);
         //hange the 
-        if(chdir(req.data) < 0){
-            printf("Directory change failed");
-            send_err_to_ns(clientSocket,"Directory change failed");
-            close(clientSocket);
-            return NULL;
-        }
+        // if(chdir(req.data) < 0){
+        //     printf("Directory change failed");
+        //     send_err_to_ns(clientSocket,"Directory change failed");
+        //     close(clientSocket);
+        //     return NULL;
+        // }
         file_dir pack;
         memset(&pack, 0, sizeof(request));
         char buff2[sizeof(file_dir)];
@@ -1020,17 +1066,24 @@ void* handle_client_req(void* arg)
             if (cnt==0)
             {
                 strcpy(src,pack.path);
+                printf("src recieved: %s\n", src);
                 cnt++;
             }
             if(pack.isFile == -10) {
                 printf("Folder pasted successfully\n");
-                printf("src: %s\n", src);
+                // printf("src: %s\n", src);
                 send_path_to_ns(src, req.data,1);
                 break;
             }
             if(pack.isFile==1)
             {
-                FILE* file = fopen(pack.path, "w");
+                char filename[MAX_PATH_LENGTH];
+                memset(filename, 0, MAX_PATH_LENGTH);
+                strcpy(filename,req.data);
+                strcat(filename,"/");
+                strcat(filename,pack.path);
+                printf("File name: %s\n", filename);
+                FILE* file = fopen(filename, "w");
                 if(file==NULL){
                     printf("File not found");
                     send_err_to_ns(clientSocket,"File not found");
@@ -1044,7 +1097,13 @@ void* handle_client_req(void* arg)
             }
             else
             {   
-                if(mkdir(pack.path, 0777) < 0){
+                char filename[MAX_PATH_LENGTH];
+                memset(filename, 0, MAX_PATH_LENGTH);
+                strcpy(filename,req.data);
+                strcat(filename,"/");
+                strcat(filename,pack.path);
+                printf("Folder name: %s\n", filename);
+                if(mkdir(filename, 0777) < 0){
                     if(errno==EEXIST){
                         printf("Folder already exists");
                         send_err_to_ns(clientSocket,"Folder already exists");
@@ -1074,12 +1133,12 @@ void* handle_client_req(void* arg)
     }
         printf("Done\n");
         // change the directory back to the original directory
-        if(chdir(cwd) < 0){
-            printf("Directory change failed");
-            send_err_to_ns(clientSocket,"Directory change failed");
-            close(clientSocket);
-            return NULL;
-        }
+        // if(chdir(cwd) < 0){
+        //     printf("Directory change failed");
+        //     send_err_to_ns(clientSocket,"Directory change failed");
+        //     close(clientSocket);
+        //     return NULL;
+        // }
     }
     else if(req.requestType==PASTEFILE)
     {
@@ -1087,12 +1146,13 @@ void* handle_client_req(void* arg)
         memset(cwd, 0, MAX_PATH_LENGTH);
         getcwd(cwd, MAX_PATH_LENGTH);
         //hange the 
-        if(chdir(req.data) < 0){
-            printf("Directory change failed");
-            send_err_to_ns(clientSocket,"Directory change failed");
-            close(clientSocket);
-            return NULL;
-        }
+        printf("req.data: %s\n", req.data);
+        // if(chdir(req.data) < 0){
+        //     printf("Directory change failed");
+        //     send_err_to_ns(clientSocket,"Directory change failed");
+        //     close(clientSocket);
+        //     return NULL;
+        // }
         file_dir pack;
         memset(&pack, 0, sizeof(request));
         char buff2[sizeof(file_dir)];
@@ -1125,22 +1185,28 @@ void* handle_client_req(void* arg)
         for(int i=0;i<strlen(filename);i++){
             temp[i] = filename[strlen(filename)-1-i];
         }
-      FILE* file=  fopen(temp, "w");
+        char temp2[MAX_PATH_LENGTH];
+        memset(temp2, 0, MAX_PATH_LENGTH);
+        strcpy(temp2, req.data);
+        strcat(temp2, "/");
+        strcat(temp2, temp);
+      FILE* file=  fopen(temp2, "w");
         fprintf(file, "%s", pack.data);
         fclose(file);
         send_path_to_ns(req.data, temp,0);
-        send_path_to_ns(pack.path, req.data,1);
+        send_path_to_ns(pack.path, req.data,2);
 
-       if(chdir(cwd)<0){
-           printf("Directory change failed");
-           send_err_to_ns(clientSocket,"Directory change failed");
-           close(clientSocket);
-           return NULL;}
+    //    if(chdir(cwd)<0){
+    //        printf("Directory change failed");
+    //        send_err_to_ns(clientSocket,"Directory change failed");
+    //        close(clientSocket);
+    //        return NULL;}
         printf("File pasted successfully\n");
     }
 
     itemcount--;
     close(clientSocket);
+    free(arg);
     return NULL;
 }
 // function to listen the client request
@@ -1148,7 +1214,7 @@ void * Client_listner(void * arg)
 {
     struct sockaddr_in serv_addr;
     int sockfd;
-    // Create socket
+    // Create socketF
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
         printf("ERROR opening socket");
@@ -1177,24 +1243,36 @@ void * Client_listner(void * arg)
         struct sockaddr_in clientaddr;
         int len = sizeof(clientaddr);
 
-        int clientSocket = accept(sockfd, (struct sockaddr *)&clientaddr, (socklen_t*)&len);
-        if(clientSocket < 0){
+        int* clientSocket = (int*)malloc(sizeof(int));
+        *clientSocket = accept(sockfd, (struct sockaddr *)&clientaddr, (socklen_t*)&len);
+        printf("New client connected\n");
+        if(*clientSocket < 0){
             printf("Client accept failed");
+            free(clientSocket);
             close(sockfd);
             return NULL;
         }
-        printf("Client connected\n");
         // handle the client request
-        if(itemcount<MAX_CLIENTS){
+        if(1){
             pthread_t tid;
             itemcount++;
-            pthread_create(&tid, NULL, handle_client_req, &clientSocket);
+            pthread_create(&tid, NULL, handle_client_req, clientSocket);
         }
         else{
             printf("Server is full\n");
-            close(clientSocket);
+            close(*clientSocket);
+            free(clientSocket);
         }
         
     }
 }
+// void*  Iamalive_thread(void* arg)
+// {
+//      int sockfd;
+//     struct sockaddr_in serv_addr;
+//     struct hostent *server;
+//     char buffer[sizeof(request)];
+//     request pack;
+//     pack.requestType = IAMALIVE;
 
+// }

@@ -24,7 +24,7 @@
 
 #define SERVER_PORT 8082
 
-#define MAX_CLIENTS 10
+#define MAX_CLIENTS 1000
 
 extern int clientSockets[MAX_CLIENTS];
 
@@ -35,7 +35,11 @@ typedef struct {
   int clientPort;
   int status;
   int numberOfPaths;
+  int backupPort1;
+  int backupPort2;
+  char backupFolder[MAX_PATH_LENGTH];
   pthread_mutex_t mutex;
+  int is_BackedUp;
 } StorageServer;
 
 extern int currentServerCount;

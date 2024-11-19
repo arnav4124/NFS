@@ -28,13 +28,14 @@ typedef enum {
    INITSS,
    ACK,
    ERROR,
-   ASYNC_WRITE_ACK,
+   WRITE_ACK,
    REGISTER_PATH,
-   REGISTER_PATH_STOP,
+   REGISTER_PATH_STOP_FILE,
+   REGISTER_PATH_STOP_FOLDER,
    HEARTBEAT,
+   IAMALIVE,
    STOP,
 } requestType;
-
 
 #define MAX_IPOP_LENGTH 20
 #define MAX_PATH_LENGTH 1024
@@ -54,7 +55,6 @@ typedef struct {
     char path[MAX_PATH_LENGTH];
 } client_request;
 
-
 typedef struct{
   requestType requestType;
   char data[MAX_STRUCT_LENGTH];
@@ -63,5 +63,6 @@ typedef struct{
 
 void logrecvfrom(char *from, char *ip, int port, char *buffer);
 void logsentto(char *to, char *ip, int port, char *buffer);
+void logerror(char *error);
 
 #endif

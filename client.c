@@ -46,10 +46,13 @@ void *listenForBackgroundAck(void *arg)
         {
             // printf("\nReceived unexpected response type: %d\n", ack_packet.requestType);
             // printf("Received response data: %s\n", ack_packet.data);
-            printf(RED "%s\n" RESET, ack_packet.data);
+            printf(RED "%s" RESET, ack_packet.data);
+            printf("\n");
             *ack_received = 0;
         }
     }
+    // printf("\033[0G\n"); 
+    fflush(stdout);
     close(sockfd);
     return NULL;
 }
@@ -78,7 +81,7 @@ requestType getRequestType(const char* operation) {
     if (strcmp(operation, "LIST") == 0) return LIST;
     if (strcmp(operation, "INFO") == 0) return INFO;
     if (strcmp(operation, "STREAM") == 0) return STREAM;
-    if (strcmp(operation, "EXIT") == 0) return INITSS;
+    // if (strcmp(operation, "EXIT") == 0) return INITSS;
     if (strcmp(operation, "ACK") == 0) return ACK;
     if (strcmp(operation, "ERROR") == 0) return ERROR;
     if (strcmp(operation, "STOP") == 0) return STOP; 
@@ -97,7 +100,7 @@ int main(int argc, char* argv[]) {
     printf(CYAN "...............Client starting.............\n" RESET);
 
     while (1) {
-        printf("Enter Command: ");
+        printf(CYAN "Enter Command: " RESET); ;
         if (!fgets(input, sizeof(input), stdin)) {
             fprintf(stderr, "Error reading input.\n");
             continue;
@@ -111,8 +114,13 @@ int main(int argc, char* argv[]) {
             printf(RED "Error: No operation provided.\n" RESET);
             continue;
         }
+        if (strcmp(token, "EXIT") == 0) {
+            printf(CYAN "Exiting client...\n" RESET);
+            break;
+        }
         strncpy(operation, token, MAX_IPOP_LENGTH);
         operation[MAX_IPOP_LENGTH - 1] = '\0';
+        // printf("Operation: %s\n", operation);
         token = strtok(NULL, " ");
         if (token != NULL) {
             strncpy(arg1, token, MAX_PATH_LENGTH);
@@ -121,20 +129,24 @@ int main(int argc, char* argv[]) {
         }
         request req;
         req.requestType = getRequestType(operation);
-        if (strcmp(operation, "WRITE") == 0) {
-            token = strtok(NULL, " ");
-            if (token != NULL) {
-                strncpy(arg2, token, MAX_PATH_LENGTH);
-                arg2[MAX_PATH_LENGTH - 1] = '\0';
-                strcpy(arg2, normalizePath(arg2));
-                if (strcmp(arg2, "--SYNC") == 0) req.requestType = WRITESYNC;
-                else {
-                    printf(RED "Error: Unrecognized flag for WRITE operation.\n" RESET);
-                    continue;
-                }                
-            }
-            else req.requestType = WRITEASYNC;
+        if (!(strcmp(operation, "READ") == 0 || strcmp(operation, "WRITESYNC") == 0 || strcmp(operation, "WRITEASYNC") == 0 || strcmp(operation, "CREATEFILE") == 0 || strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "DELETEFILE") == 0 || strcmp(operation, "DELETEFOLDER") == 0 || strcmp(operation, "COPYFILE") == 0 || strcmp(operation, "COPYFOLDER") == 0 || strcmp(operation, "LIST") == 0 || strcmp(operation, "INFO") == 0 || strcmp(operation, "STREAM") == 0 || strcmp(operation, "EXIT") == 0)) {
+            printf(RED "Error: Unrecognized operation.\n" RESET);
+            continue;
         }
+        // if (strcmp(operation, "WRITE") == 0) {
+        //     token = strtok(NULL, " ");
+        //     if (token != NULL) {
+        //         strncpy(arg2, token, MAX_PATH_LENGTH);
+        //         arg2[MAX_PATH_LENGTH - 1] = '\0';
+        //         strcpy(arg2, normalizePath(arg2));
+        //         if (strcmp(arg2, "--SYNC") == 0) req.requestType = WRITESYNC;
+        //         else {
+        //             printf(RED "Error: Unrecognized flag for WRITE operation.\n" RESET);
+        //             continue;
+        //         }                
+        //     }
+        //     else req.requestType = WRITEASYNC;
+        // }
         else if (strcmp(operation, "COPYFILE") == 0 || strcmp(operation, "COPYFOLDER") == 0 || strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "CREATEFILE") == 0) {
             token = strtok(NULL, " ");
             if (token != NULL) {
@@ -154,12 +166,12 @@ int main(int argc, char* argv[]) {
         else if (arg1[0] && req.requestType != LIST) snprintf(req.data, MAX_STRUCT_LENGTH, "%s", arg1);
         else req.data[0] = '\0';
         // printf("arg1: %s, arg2: %s\n", arg1, arg2);
-        printf("1RequestType: %d, Data: %s\n", req.requestType, req.data);
+        // printf("1RequestType: %d, Data: %s\n", req.requestType, req.data);
 
 
         int sockfd = socket(AF_INET, SOCK_STREAM, 0);
         if (sockfd < 0) {
-            perror("Error creating socket");
+            perror(RED "Error creating socket\n" RESET);
             continue;
         }
         struct sockaddr_in ns_addr;
@@ -167,13 +179,13 @@ int main(int argc, char* argv[]) {
         ns_addr.sin_port = htons(NAME_SERVER_PORT);
         ns_addr.sin_addr.s_addr = inet_addr(nsip);
         if (connect(sockfd, (struct sockaddr*)&ns_addr, sizeof(ns_addr)) < 0) {
-            perror("Error connecting to naming server");
+            perror(RED "Error connecting to naming server\n" RESET);
             close(sockfd);
             continue;
         }
 
         if (send(sockfd, &req, sizeof(req), 0) < 0) {
-            perror("Error sending request to naming server");
+            perror(RED "Error sending request to naming server\n" RESET);
             close(sockfd);
             continue;
         }
@@ -183,60 +195,75 @@ int main(int argc, char* argv[]) {
         timeout.tv_usec = 0;
         if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
         {
-            perror("Error setting socket options");
+            perror(RED "Error setting socket options\n" RESET);
             close(sockfd);
             continue;
         }
 
         request ns_ack;
         if (recv(sockfd, &ns_ack, sizeof(ns_ack), 0) < 0) {
-            perror("Error receiving response from naming server");
+            perror(RED "Error receiving response from naming server\n" RESET);
             close(sockfd);
             continue;
         }
         
         if (ns_ack.requestType != ACK) {
-            printf("Error: Unexpected response from naming server. RequestType: %d\n", ns_ack.requestType);
+            printf(RED "Error: Unexpected response from naming server. RequestType: %d\n" RESET, ns_ack.requestType);
             close(sockfd);
             continue;
         }
-        printf("Received ACK from naming server. Data: %s\n", ns_ack.data);
-        
+        // if (req.requestType == LIST) printf("Received ACK from naming server. Data: %s\n", ns_ack.data);
+        // if (!(req.requestType == WRITEASYNC || req.requestType == COPYFILE || req.requestType == COPYFOLDER)) printf(CYAN "%s\n" RESET, ns_ack.data);
 
         if (req.requestType == COPYFILE || req.requestType == COPYFOLDER) goto COPY; 
 
-            request ns_response;
-            if (recv(sockfd, &ns_response, sizeof(ns_response), 0) < 0) {
-                perror("Error receiving response from naming server");
-                close(sockfd);
-                // exit(1);
+        request ns_response;
+        if (recv(sockfd, &ns_response, sizeof(ns_response), 0) < 0) {
+            perror(RED "Error receiving response from naming server\n" RESET);
+            close(sockfd);
+            // exit(1);
+            continue;
+        }
+        if (req.requestType != WRITEASYNC && req.requestType != COPYFILE && req.requestType != COPYFOLDER) close(sockfd);
+        // printf("Naming Server Response - RequestType: %d, \nData: %s\n", ns_response.requestType, ns_response.data);
+        // printf(CYAN "%s\n" RESET, ns_response.data);
+        if (ns_response.requestType == ERROR || req.requestType == LIST) {
+            printf(CYAN "%s\n" RESET, ns_response.data);
+            continue;
+        }
+        // printf("2RequestType: %d, Data: %s\n", req.requestType, req.data);
+        printf(CYAN "%s\n" RESET, req.data);
+        if (req.requestType == LIST) {
+            // printf("printed list items above");
+            continue;
+        }    
+        
+        char storage_server_ip[MAX_IPOP_LENGTH], storage_server_port[MAX_IPOP_LENGTH], readpath[MAX_PATH_LENGTH];
+        memset(storage_server_ip, 0, sizeof(storage_server_ip));
+        memset(storage_server_port, 0, sizeof(storage_server_port));
+        memset(readpath, 0, sizeof(readpath));
+        if (req.requestType == READ) {
+            if (sscanf(ns_response.data, "%s %s %s", storage_server_ip, storage_server_port, readpath) != 3) {
+                printf(RED "Error: Invalid response from naming server.\n" RESET);
                 continue;
             }
-            if (req.requestType != WRITEASYNC && req.requestType != COPYFILE && req.requestType != COPYFOLDER) close(sockfd);
-            printf("Naming Server Response - RequestType: %d, \nData: %s\n", ns_response.requestType, ns_response.data);
-
-            if (ns_response.requestType == ERROR) {
-                printf("Error: %s\n", ns_response.data);
-                continue;
-            }
-            printf("2RequestType: %d, Data: %s\n", req.requestType, req.data);
-
-            if (req.requestType == LIST) {
-                // printf("printed list items above");
-                continue;
-            }    
-            
-            char storage_server_ip[MAX_IPOP_LENGTH], storage_server_port[MAX_IPOP_LENGTH];
-            memset(storage_server_ip, 0, sizeof(storage_server_ip));
-            memset(storage_server_port, 0, sizeof(storage_server_port));
+        }
+        else {
             if (sscanf(ns_response.data, "%s %s", storage_server_ip, storage_server_port) != 2) {
-                printf("Error: Invalid response from naming server.\n");
+                printf(RED "Error: Invalid response from naming server.\n" RESET);
                 continue;
             }
-            // printf("Storage Server IP: %s, Port: %s\n", storage_server_ip, storage_server_port);
-            fflush(stdout);
+        }
 
-            COPY:
+        if (req.requestType == READ) {
+            memset(req.data, 0, sizeof(req.data));
+            strcpy(req.data, readpath);
+        }
+        printf("%s\n", readpath);
+
+        // printf("Storage Server IP: %s, Port: %s\n", storage_server_ip, storage_server_port);
+        fflush(stdout);
+        COPY:
 
         // printf("operation: %s\n", operation);
         if (strcmp(operation, "CREATEFILE") == 0 || strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "DELETEFILE") == 0 || strcmp(operation, "DELETEFOLDER") == 0 || strcmp(operation, "COPY") == 0) {
@@ -247,7 +274,7 @@ int main(int argc, char* argv[]) {
             pthread_t ack_thread;
             AckThreadArgs thread_args = {.sockfd = sockfd, .ack_received = &ack_received};
             pthread_create(&ack_thread, NULL, listenForBackgroundAck, (void *)&thread_args);
-            printf("COPY FILE/FOLDER operation sent - acknowledgment will be received in background\n");
+            // printf("COPY FILE/FOLDER operation sent - acknowledgment will be received in background\n");
             continue;
         }
 
@@ -255,7 +282,7 @@ int main(int argc, char* argv[]) {
 
         int ss_sockfd = socket(AF_INET, SOCK_STREAM, 0);
         if (ss_sockfd < 0) {
-            perror("Error creating socket");
+            perror(RED "Error creating socket\n" RESET);
             continue;
             // exit(1);
         }
@@ -264,29 +291,29 @@ int main(int argc, char* argv[]) {
         ss_addr.sin_port = htons(atoi(storage_server_port));
         ss_addr.sin_addr.s_addr = inet_addr(storage_server_ip);
         if (connect(ss_sockfd, (struct sockaddr*)&ss_addr, sizeof(ss_addr)) < 0) {
-            perror("Error connecting to storage server");
+            perror(RED "Error connecting to storage server\n" RESET);
             close(ss_sockfd);
             // exit(1);
             continue;
         }
         if (setsockopt(ss_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
         {
-            perror("Error setting socket options");
+            perror(RED "Error setting socket options\n" RESET);
             close(sockfd);
             continue;
         }
         if (send(ss_sockfd, &req, sizeof(req), 0) < 0)
         {
-            perror("Error sending request to storage server");
+            perror(RED "Error sending request to storage server\n" RESET);
             close(ss_sockfd);
             // exit(1);
             continue;
         }
-        printf("request data: %s", req.data);
+        // printf("request data: %s", req.data);
         int send_write_flag = 1;
         if (req.requestType == WRITEASYNC || req.requestType == WRITESYNC)
         {
-            printf("Enter content to write (type 2 consecutive enters to stop):\n");
+            printf(CYAN "Enter content to write (type 2 consecutive enters to stop):\n" RESET);
             char buffer[10];
             int consecutive_newlines = 0;
             ssize_t bytes_sent;
@@ -294,7 +321,7 @@ int main(int argc, char* argv[]) {
             {
                 if (!fgets(buffer, sizeof(buffer), stdin))
                 {
-                    perror("Error reading input");
+                    perror(RED "Error reading input\n" RESET);
                     break;
                 }
                 if (buffer[0] == '\n')
@@ -314,7 +341,7 @@ int main(int argc, char* argv[]) {
                 if (bytes_sent < 0)
                 {
                     send_write_flag = 0;
-                    perror("Error sending data to storage server");
+                    perror(RED "Error sending data to storage server\n" RESET);
                     close(ss_sockfd);
                     // exit(EXIT_FAILURE);
                     break;
@@ -329,7 +356,7 @@ int main(int argc, char* argv[]) {
             bytes_sent = send(ss_sockfd, &ss_send, sizeof(ss_send), 0);
             if (bytes_sent < 0)
             {
-                perror("Error sending STOP to storage server");
+                perror(RED "Error sending STOP to storage server\n" RESET);
                 close(ss_sockfd);
                 // exit(EXIT_FAILURE);
                 continue;
@@ -343,7 +370,7 @@ int main(int argc, char* argv[]) {
             char buffer[MAX_STRUCT_LENGTH];
             FILE *audio_player = popen("ffplay -autoexit -nodisp -", "w");
             if (audio_player == NULL) {
-                perror("Error opening audio player");
+                perror(RED "Error opening audio player\n" RESET);
                 close(sockfd);
                 // exit(EXIT_FAILURE);
                 continue;
@@ -354,23 +381,24 @@ int main(int argc, char* argv[]) {
                 fflush(audio_player);
             }
             if (bytes_received < 0) {
-                perror("Error receiving audio data");
+                perror(RED "Error receiving audio data\n" RESET);
                 continue;
             }
-            else printf("Audio stream ended\n");
+            // else printf("Audio stream ended\n");
             pclose(audio_player);
             close(ss_sockfd);
         }
         else if (req.requestType == READ) {
             request ss_response;
             ssize_t bytes_received;
-            printf("Starting READ operation...\n");
+            // printf("Starting READ operation...\n");
             while ((bytes_received = recv(ss_sockfd, &ss_response, sizeof(ss_response), 0)) > 0)
             {
-                printf("%s", ss_response.data);
+                if (req.requestType != ACK) printf("%s", ss_response.data);
             }
+            printf("\n");
             if (bytes_received < 0)
-                perror("Error receiving data for READ request");
+                perror(RED "Error receiving data for READ request\n" RESET);
             // else
             //     printf("READ operation completed, no more data.\n");
             close(ss_sockfd);
@@ -378,18 +406,19 @@ int main(int argc, char* argv[]) {
         else {
             request ss_response;
             if (recv(ss_sockfd, &ss_response, sizeof(ss_response), 0) < 0) {
-                perror("Error receiving response from storage server");
+                perror(RED "Error receiving response from storage server\n" RESET);
                 close(ss_sockfd);
                 continue;
             }          
-            printf("Storage Server Response - RequestType: %d, Data: %s\n", ss_response.requestType, ss_response.data);
+            // printf("Storage Server Response - RequestType: %d, Data: %s\n", ss_response.requestType, ss_response.data);
+            printf(CYAN "%s\n" RESET, ss_response.data);
             if (req.requestType == WRITEASYNC)
             {
                 int ack_received = 0;
                 pthread_t ack_thread;
                 AckThreadArgs thread_args = {.sockfd = sockfd, .ack_received = &ack_received};
                 pthread_create(&ack_thread, NULL, listenForBackgroundAck, (void *)&thread_args);
-                printf("Write operation sent - acknowledgment will be received in background\n");
+                // printf("Write operation sent - acknowledgment will be received in background\n");
                 continue;
             }
             close(ss_sockfd);

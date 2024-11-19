@@ -4,7 +4,7 @@
 TrieNode *initialize_node() {
     TrieNode *node = (TrieNode *)malloc(sizeof(TrieNode));
     if (!node) {
-        fprintf(stderr, ERROR_MSG("Failed to allocate memory for trie node: %s\n"), strerror(errno));
+        printf("Failed to allocate memory for trie node: %s\n", strerror(errno));
         return NULL;
     }
     node->path_fragment = NULL;
@@ -25,7 +25,7 @@ int add_path(TrieNode *root, const char *path, int id) {
         if (!current->children[index]) {
             current->children[index] = initialize_node();
             if (!current->children[index]) {
-                fprintf(stderr, ERROR_MSG("Failed to create a new trie node.\n"));
+                printf("Failed to initialize node for path: %s\n", path);
                 return 0;
             }
         }
@@ -66,19 +66,6 @@ int remove_path(TrieNode *root, const char *path) {
     return 1;
 }
 
-// Print all paths in the trie
-void display_paths(TrieNode *root) {
-    if (!root) return;
-    if (root->is_terminal) {
-        printf("%s %d\n", root->path_fragment, root->id);
-    }
-    for (int i = 0; i < 256; ++i) {
-        if (root->children[i]) {
-            display_paths(root->children[i]);
-        }
-    }
-}
-
 // Copy all paths into a buffer
 void store_paths_in_buffer(TrieNode *root, char *buffer) {
     if (!root) return;
@@ -97,7 +84,7 @@ void store_paths_in_buffer(TrieNode *root, char *buffer) {
 PathList *initialize_path_list() {
     PathList *list = (PathList *)malloc(sizeof(PathList));
     if (!list) {
-        fprintf(stderr, ERROR_MSG("Failed to allocate memory for path list: %s\n"), strerror(errno));
+        printf("Failed to allocate memory for path list: %s\n", strerror(errno));
         return NULL;
     }
     list->size = 0;
@@ -110,7 +97,7 @@ PathList *initialize_path_list() {
 PathNode *initialize_path_node(const char *path) {
     PathNode *node = (PathNode *)malloc(sizeof(PathNode));
     if (!node) {
-        fprintf(stderr, ERROR_MSG("Failed to allocate memory for path node: %s\n"), strerror(errno));
+        printf("Failed to allocate memory for path node: %s\n", strerror(errno));
         return NULL;
     }
     node->path = strdup(path);

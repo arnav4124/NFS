@@ -1,5 +1,4 @@
 #include "./storageserver.h"
-// #include "./requests.h"
 #include "./commonheaders.h"
 #include "namingserver.h"
 #include <pthread.h>
@@ -194,6 +193,8 @@ int main(int argc, char *argv[]) {
     // sleep(0.1) ;
     pthread_t client_listener;
     pthread_create(&client_listener, NULL, Client_listner, argv[1]);
+    pthread_t Iamalive;
+    // pthread_create(&Iamalive, NULL, Iamalive_thread, argv[1]);
     pthread_join(ns_listener, NULL);
     pthread_join(client_listener, NULL);
 
