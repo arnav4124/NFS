@@ -14,21 +14,7 @@ int connectTo(int port, char* ip){
     struct hostent *server;
 
     // Create socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);    
-
-
-    struct timeval timeout;      
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                sizeof timeout) < 0)
-        perror("setsockopt failed\n");
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                sizeof timeout) < 0);
-    perror("setsockopt failed\n");
-
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);  
 
     // Get server information
     server = gethostbyname(ip);
@@ -403,7 +389,7 @@ void connectToSS(StorageServer ss, int ssSocket){
             }
             pthread_mutex_unlock(&storageServersList[i]->mutex);
             pthread_t hb;
-            pthread_create(&hb, NULL, heartbeat, (void*)storageServersList[i]);
+            // pthread_create(&hb, NULL, heartbeat, (void*)storageServersList[i]);
             printf("Received paths from storage server\n");
             break;
         }    
@@ -1199,13 +1185,6 @@ void* heartbeat(void* arg)
         struct timeval timeout;      
         timeout.tv_sec = 10;
         timeout.tv_usec = 0;
-
-        if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                    sizeof timeout) < 0)
-            perror("setsockopt failed\n");
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                sizeof timeout) < 0);
         if(sockfd < 0){
             pthread_mutex_lock(&ss->mutex);
             printf("Storage server %s:%d is down\n", ss->ssIP, ss->ssPort);

@@ -17,17 +17,6 @@ void* send_write_ack_to_ns(char* filename)
         return NULL;
     }
 
-           struct timeval timeout;      
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                sizeof timeout) < 0)
-        perror("setsockopt failed\n");
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                sizeof timeout) < 0);
-
     struct hostent *server;
     server = gethostbyname(NS_IP);
     if (server == NULL) {
@@ -240,16 +229,6 @@ void* writeAsync(void* args){
     int sock;
     struct sockaddr_in serv_addr;
     sock = socket(AF_INET, SOCK_STREAM, 0);
-           struct timeval timeout;      
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
-
-    if (setsockopt (sock, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                sizeof timeout) < 0)
-        perror("setsockopt failed\n");
-
-    if (setsockopt (sock, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                sizeof timeout) < 0);
     if (sock < 0) {
         printf("ERROR opening socket");
         return NULL;
@@ -342,16 +321,6 @@ void* send_path_to_ns(char* cwd, char* path,int fl)
     int sockfd;
     // Create socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-           struct timeval timeout;      
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                sizeof timeout) < 0)
-        perror("setsockopt failed\n");
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                sizeof timeout) < 0);
     if (sockfd < 0) {
         printf("ERROR opening socket");
         return NULL;
@@ -423,16 +392,6 @@ void* send_unlock_ack_to_ns(char* path)
     int sockfd;
     // Create socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-           struct timeval timeout;      
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                sizeof timeout) < 0)
-        perror("setsockopt failed\n");
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                sizeof timeout) < 0);
     if (sockfd < 0) {
         printf("ERROR opening socket");
         return NULL;
@@ -593,16 +552,6 @@ void * handle_ns_req(void* arg){
                
                 printf("Ip %s Port %d Path %s Dest %s\n",ip,portno,path,dest);
                 int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-                       struct timeval timeout;      
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                sizeof timeout) < 0)
-        perror("setsockopt failed\n");
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                sizeof timeout) < 0);
                 if (sockfd < 0) {
                     printf("ERROR opening socket");
                     return NULL;
@@ -646,16 +595,6 @@ void * handle_ns_req(void* arg){
                 printf("Port: %d\n", portno);
                 printf("Path: %s\n", path);
                 int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-                       struct timeval timeout;      
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                sizeof timeout) < 0)
-        perror("setsockopt failed\n");
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                sizeof timeout) < 0);
                 if (sockfd < 0) {
                     printf("ERROR opening socket");
                     return NULL;
@@ -728,16 +667,6 @@ void* NS_listener(void* arg){
      
         // Create socket
     ns_sockfd = socket(AF_INET, SOCK_STREAM, 0);
-           struct timeval timeout;      
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
-
-    if (setsockopt (ns_sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                sizeof timeout) < 0)
-       perror("setsockopt failed\n");
-
-    if (setsockopt (ns_sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                sizeof timeout) < 0);
     if (ns_sockfd < 0) {
         printf("ERROR opening socket");
         return NULL;
@@ -787,16 +716,6 @@ void* send_reg_path_to_ns(char * path)
     int sockfd;
     // Create socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-       struct timeval timeout;      
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                sizeof timeout) < 0)
-        perror("setsockopt failed\n");
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                sizeof timeout) < 0);
     if (sockfd < 0) {
         printf("ERROR opening socket");
         return NULL;
@@ -1280,16 +1199,6 @@ void * Client_listner(void * arg)
     int sockfd;
     // Create socketF
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    struct timeval timeout;      
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                sizeof timeout) < 0)
-        perror("setsockopt failed\n");
-
-    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                sizeof timeout) < 0);
     if (sockfd < 0) {
         printf("ERROR opening socket");
         return NULL;
@@ -1323,8 +1232,8 @@ void * Client_listner(void * arg)
         if(*clientSocket < 0){
             printf("Client accept failed");
             free(clientSocket);
-            close(sockfd);
-            return NULL;
+            // close(sockfd);
+            // return NULL;
         }
         // handle the client request
         pthread_t tid;
@@ -1332,13 +1241,3 @@ void * Client_listner(void * arg)
         
     }
 }
-// void*  Iamalive_thread(void* arg)
-// {
-//      int sockfd;
-//     struct sockaddr_in serv_addr;
-//     struct hostent *server;
-//     char buffer[sizeof(request)];
-//     request pack;
-//     pack.requestType = IAMALIVE;
-
-// }
