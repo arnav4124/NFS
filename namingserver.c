@@ -5,7 +5,7 @@
 int serverPorts = 8082;
 StorageServer* storageServersList[MAX_SERVERS];
 int currentServerCount = 0;
-int sockfd;
+int sockfdMaster;
 int clientSockets[MAX_CLIENTS];
 
 LRUList* lruCache;
@@ -27,8 +27,8 @@ void setupConnectionToClient() {
 
 // Set up the socket once, before the loop
 struct sockaddr_in servaddr;
-sockfd = socket(AF_INET, SOCK_STREAM, 0);
-if (sockfd == -1) {
+sockfdMaster = socket(AF_INET, SOCK_STREAM, 0);
+if (sockfdMaster == -1) {
     perror("Socket creation failed");
     exit(EXIT_FAILURE);
 }
@@ -38,20 +38,21 @@ bzero(&servaddr, sizeof(servaddr));
 servaddr.sin_family = AF_INET;
 servaddr.sin_addr.s_addr = INADDR_ANY;
 servaddr.sin_port = htons(SERVER_PORT);
-// setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
-if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+setsockopt(sockfdMaster, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+if (bind(sockfdMaster, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
     perror("Bind failed");
-    close(sockfd);
+    close(sockfdMaster);
     exit(EXIT_FAILURE);
 }
 printf("Bind to port %d successful...\n", SERVER_PORT);
 
+if (listen(sockfdMaster, MAX_CLIENTS) < 0) {
+    perror("Listen failed");
+    close(sockfdMaster);
+    exit(EXIT_FAILURE);
+}   
+
 while (1) {
-    if (listen(sockfd, MAX_CLIENTS) < 0) {
-        perror("Listen failed");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }   
     int clientSocketID = findFreeClientSocketIndex();
     if (clientSocketID == -1) {
         printf("No free client sockets");
@@ -60,7 +61,7 @@ while (1) {
 
     struct sockaddr_in clientaddr;
     int len = sizeof(clientaddr);
-    clientSockets[clientSocketID] = accept(sockfd, (struct sockaddr *)&clientaddr, (socklen_t*)&len);
+    clientSockets[clientSocketID] = accept(sockfdMaster, (struct sockaddr *)&clientaddr, (socklen_t*)&len);
 
     if (clientSockets[clientSocketID] < 0) {
         perror("Client accept failed");
@@ -98,7 +99,7 @@ while (1) {
         clientSockets[clientSocketID] = -1;
     } 
 }
-    close(sockfd);
+    close(sockfdMaster);
     return;
 }
 

@@ -387,7 +387,7 @@ void connectToSS(StorageServer ss, int ssSocket){
             }
             pthread_mutex_unlock(&storageServersList[i]->mutex);
             pthread_t hb;
-            // pthread_create(&hb, NULL, heartbeat, (void*)storageServersList[i]);
+            pthread_create(&hb, NULL, heartbeat, (void*)storageServersList[i]);
             printf("Received paths from storage server\n");
             break;
         }    
@@ -1032,32 +1032,37 @@ void* processRequests(void* args){
         connectToSS(ss, clientSockets[req->clientID]);
         close(clientSockets[req->clientID]);
         clientSockets[req->clientID] = -1;
+        free(req);
     }
     else if(req->requestType == CREATEFOLDER || req->requestType == CREATEFILE){
         // create file
         handleCreate(req);
         close(clientSockets[req->clientID]);
         clientSockets[req->clientID] = -1;
+        free(req);
     }
     else if(req->requestType == DELETEFOLDER || req->requestType == DELETEFILE){
         // delete file
         handleDelete(req);
         close(clientSockets[req->clientID]);
         clientSockets[req->clientID] = -1;
-        
+        free(req);        
     }
     else if(req->requestType == WRITESYNC ||  req->requestType == READ || req->requestType == INFO || req->requestType == STREAM){
         handleClientSSRequests(req); 
         close(clientSockets[req->clientID]);
         clientSockets[req->clientID] = -1;
+        free(req);
     }
     else if(req->requestType == WRITEASYNC ){
         handleClientSSRequests(req);  
+        free(req);
     }
     else if(req->requestType == LIST){
         listAllPaths(req);
-        clientSockets[req->clientID] = -1;
         close(clientSockets[req->clientID]);
+        clientSockets[req->clientID] = -1;
+        free(req);
     }
     else if(req->requestType == ACK){
         // unlock the path
@@ -1067,6 +1072,7 @@ void* processRequests(void* args){
         removeWritePath(&writePathsLL, data);
         close(clientSockets[req->clientID]);
         clientSockets[req->clientID] = -1;
+        free(req);
     }
     else if(req->requestType == WRITE_ACK){
         char data[MAX_PATH_LENGTH];
@@ -1090,6 +1096,7 @@ void* processRequests(void* args){
 
         close(clientSockets[req->clientID]);
         clientSockets[req->clientID] = -1;
+        free(req);
     }
     else if(req->requestType == COPYFOLDER){
         handleCopyingFolders(req);
@@ -1122,6 +1129,7 @@ void* processRequests(void* args){
 
         close(clientSockets[req->clientID]);
         clientSockets[req->clientID] = -1;    
+        free(req);
     }
     else if(req->requestType == REGISTER_PATH_STOP_FILE){
         printf("Path %s is no longer being written to\n", req->data);
@@ -1141,7 +1149,7 @@ void* processRequests(void* args){
 
         writePathNode* temp = findWritePath(&writePathsLL, req->data);
         backup(temp->portNumber, getSSIDFromPort(temp->portNumber), temp->dest_path, COPYFILE);
-
+        free(req);
     }
     else if(req->requestType == REGISTER_PATH_STOP_FOLDER){
         printf("Path %s is no longer being written to\n", req->data);
@@ -1170,6 +1178,7 @@ void* heartbeat(void* arg)
 {
     StorageServer* ss = (StorageServer*)arg;
     while(1){
+        sleep(5);
         int sockfd = connectTo(ss->ssPort, ss->ssIP);
         if(sockfd < 0){
             pthread_mutex_lock(&ss->mutex);

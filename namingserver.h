@@ -45,7 +45,7 @@ typedef struct {
 extern int currentServerCount;
 extern StorageServer* storageServersList[MAX_SERVERS];
 
-extern int sockfd;
+extern int sockfdMaster;
 
 extern int serverPorts ;
 

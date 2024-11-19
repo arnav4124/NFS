@@ -185,7 +185,6 @@ void* fts_search( char* arg,int clientSocket,char* dest)
 
 
 // #include "storageserver.c"
-// int itemcount = 0;
  int ns_sockfd;
 void* send_ack_to_ns(int Socket,char *msg)
 {
@@ -656,9 +655,7 @@ void * handle_ns_req(void* arg){
 
 
     }
-        
-
-   itemcount--;
+    
    free(arg);
 return NULL;
 }
@@ -676,7 +673,7 @@ void* NS_listener(void* arg){
     // Prepare server address
     bzero((char *)&serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(PORT);
     setsockopt(ns_sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
     // Bind the socket
@@ -705,15 +702,8 @@ void* NS_listener(void* arg){
         }
         // printf("Client connected\n");
         // handle the client request
-        if(1){
-            pthread_t tid;
-            itemcount++;
-            pthread_create(&tid, NULL, handle_ns_req, clientSocket);
-        }
-        else{
-            printf("Server is full\n");
-            close(*clientSocket);
-        }
+        pthread_t tid;
+        pthread_create(&tid, NULL, handle_ns_req, clientSocket);
         
     }
 
@@ -1132,13 +1122,6 @@ void* handle_client_req(void* arg)
             memset(buff2, 0, sizeof(request));
     }
         printf("Done\n");
-        // change the directory back to the original directory
-        // if(chdir(cwd) < 0){
-        //     printf("Directory change failed");
-        //     send_err_to_ns(clientSocket,"Directory change failed");
-        //     close(clientSocket);
-        //     return NULL;
-        // }
     }
     else if(req.requestType==PASTEFILE)
     {
@@ -1203,8 +1186,6 @@ void* handle_client_req(void* arg)
     //        return NULL;}
         printf("File pasted successfully\n");
     }
-
-    itemcount--;
     close(clientSocket);
     free(arg);
     return NULL;
@@ -1223,7 +1204,7 @@ void * Client_listner(void * arg)
     // Prepare server address
     bzero((char *)&serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(CLIENT_PORT);
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
     // Bind the socket
@@ -1253,16 +1234,8 @@ void * Client_listner(void * arg)
             return NULL;
         }
         // handle the client request
-        if(1){
-            pthread_t tid;
-            itemcount++;
-            pthread_create(&tid, NULL, handle_client_req, clientSocket);
-        }
-        else{
-            printf("Server is full\n");
-            close(*clientSocket);
-            free(clientSocket);
-        }
+        pthread_t tid;
+        pthread_create(&tid, NULL, handle_client_req, clientSocket);
         
     }
 }
