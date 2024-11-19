@@ -133,20 +133,6 @@ int main(int argc, char* argv[]) {
             printf(RED "Error: Unrecognized operation.\n" RESET);
             continue;
         }
-        // if (strcmp(operation, "WRITE") == 0) {
-        //     token = strtok(NULL, " ");
-        //     if (token != NULL) {
-        //         strncpy(arg2, token, MAX_PATH_LENGTH);
-        //         arg2[MAX_PATH_LENGTH - 1] = '\0';
-        //         strcpy(arg2, normalizePath(arg2));
-        //         if (strcmp(arg2, "--SYNC") == 0) req.requestType = WRITESYNC;
-        //         else {
-        //             printf(RED "Error: Unrecognized flag for WRITE operation.\n" RESET);
-        //             continue;
-        //         }                
-        //     }
-        //     else req.requestType = WRITEASYNC;
-        // }
         else if (strcmp(operation, "COPYFILE") == 0 || strcmp(operation, "COPYFOLDER") == 0 || strcmp(operation, "CREATEFOLDER") == 0 || strcmp(operation, "CREATEFILE") == 0) {
             token = strtok(NULL, " ");
             if (token != NULL) {

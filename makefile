@@ -3,15 +3,11 @@
 # Compiler
 CC = clang
 
-define HASH 
-#
-endef
-
 # Compiler flags
-CFLAGS = -Wall -g -Wno-$(HASH)warnings
+CFLAGS = -Wall -g 
 
 # Source files
-all : client nm  1ss 2ss 3ss
+all : client nm ss1 ss2 ss3
 
 client : client.c client.h
 	$(CC) $(CFLAGS) client.c -o client
@@ -19,14 +15,14 @@ client : client.c client.h
 nm : namingserver.c trie.c requests.c lru.c log.c lru.h trie.h requests.h namingserver.h
 	$(CC) $(CFLAGS) namingserver.c trie.c requests.c lru.c log.c -o nm
 
-1ss: storageserver.c ss_functions.c lru.c lru.h ss_functions.h storageserver.h
-	$(CC) $(CFLAGS) storageserver.c ss_functions.c lru.c -o 1ss -DPORT=8081
+ss1: storageserver.c ss_functions.c lru.c lru.h ss_functions.h storageserver.h
+	$(CC) $(CFLAGS) storageserver.c ss_functions.c lru.c -o ss1 -DPORT=8100
 
-2ss: storageserver.c ss_functions.c lru.c lru.h ss_functions.h storageserver.h
-	$(CC) $(CFLAGS) storageserver.c ss_functions.c lru.c -o 2ss -DPORT=8082
+ss2: storageserver.c ss_functions.c lru.c lru.h ss_functions.h storageserver.h
+	$(CC) $(CFLAGS) storageserver.c ss_functions.c lru.c -o ss2 -DPORT=8102
 
-3ss: storageserver.c ss_functions.c lru.c lru.h ss_functions.h storageserver.h
-	$(CC) $(CFLAGS) storageserver.c ss_functions.c lru.c -o 3ss -DPORT=8083
+ss3: storageserver.c ss_functions.c lru.c lru.h ss_functions.h storageserver.h
+	$(CC) $(CFLAGS) storageserver.c ss_functions.c lru.c -o ss3 -DPORT=8104
 
 clean:
-	rm -f client nm  1ss 2ss 3ss
+	rm -f client nm  ss1 ss2 ss3

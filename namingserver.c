@@ -38,7 +38,7 @@ bzero(&servaddr, sizeof(servaddr));
 servaddr.sin_family = AF_INET;
 servaddr.sin_addr.s_addr = INADDR_ANY;
 servaddr.sin_port = htons(SERVER_PORT);
-setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+// setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
 if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
     perror("Bind failed");
     close(sockfd);

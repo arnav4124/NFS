@@ -31,14 +31,14 @@ nm : namingserver.c trie.c requests.c lru.c log.c lru.h trie.h requests.h naming
         makefile_content += f"""
 
 ss{i}: storageserver.c ss_functions.c lru.c lru.h ss_functions.h storageserver.h
-\t$(CC) $(CFLAGS) storageserver.c ss_functions.c lru.c -o {i}ss -DPORT={port}"""
+\t$(CC) $(CFLAGS) storageserver.c ss_functions.c lru.c -o ss{i} -DPORT={port+2*i}"""
 
     makefile_content += """
 
 clean:
 \trm -f client nm """
     for i in range(1, n+1):
-        makefile_content += f" {i}ss"
+        makefile_content += f" ss{i}"
 
     with open("makefile", "w") as f:
         f.write(makefile_content)

@@ -14,12 +14,7 @@ int connectTo(int port, char* ip){
     struct hostent *server;
 
     // Create socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) {
-        perror("ERROR opening socket");
-        return -1;
-    }
-    
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);    
     // Get server information
     server = gethostbyname(ip);
     if (server == NULL) {
@@ -392,7 +387,7 @@ void connectToSS(StorageServer ss, int ssSocket){
             }
             pthread_mutex_unlock(&storageServersList[i]->mutex);
             pthread_t hb;
-            pthread_create(&hb, NULL, heartbeat, (void*)storageServersList[i]);
+            // pthread_create(&hb, NULL, heartbeat, (void*)storageServersList[i]);
             printf("Received paths from storage server\n");
             break;
         }    
@@ -1175,7 +1170,6 @@ void* heartbeat(void* arg)
 {
     StorageServer* ss = (StorageServer*)arg;
     while(1){
-        sleep(1);
         int sockfd = connectTo(ss->ssPort, ss->ssIP);
         if(sockfd < 0){
             pthread_mutex_lock(&ss->mutex);
