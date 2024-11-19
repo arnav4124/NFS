@@ -290,7 +290,7 @@ void sendMessageToClient(int clientSocket, requestType type, char* data){
 
 void init_redundancy(StorageServer* ss){
     StorageServer* backup1 = storageServersList[getSSIDFromPort(ss->backupPort1)];
-    StorageServer* backup2 = storageServersList[getSSIDFromPort(ss->backupPort2)];
+    // StorageServer* backup2 = storageServersList[getSSIDFromPort(ss->backupPort2)];
     if(backup1->status)
     {
         // search all paths in backup1 which are in ss

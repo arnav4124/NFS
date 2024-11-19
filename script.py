@@ -9,19 +9,14 @@ def generate_makefile(n):
 # Compiler
 CC = clang
 
-define HASH 
-#
-endef
-
 # Compiler flags
-CFLAGS = -Wall -g -Wno-$(HASH)warnings
+CFLAGS = -Wall -g 
 
 # Source files
-all : client nm 
-"""
+all : client nm"""
 
     for i in range(1, n+1):
-        makefile_content += f" {i}ss"
+        makefile_content += f" ss{i}"
         port = 8094 + (i-1) * 2
 
     makefile_content += """
@@ -35,7 +30,7 @@ nm : namingserver.c trie.c requests.c lru.c log.c lru.h trie.h requests.h naming
     for i in range(1, n+1):
         makefile_content += f"""
 
-{i}ss: storageserver.c ss_functions.c lru.c lru.h ss_functions.h storageserver.h
+ss{i}: storageserver.c ss_functions.c lru.c lru.h ss_functions.h storageserver.h
 \t$(CC) $(CFLAGS) storageserver.c ss_functions.c lru.c -o {i}ss -DPORT={port}"""
 
     makefile_content += """
@@ -50,7 +45,7 @@ clean:
 
 def create_folders(n):
     for i in range(1, n+1):
-        folder_name = f"ss{i}"
+        folder_name = f"dir{i}"
         if os.path.exists(folder_name):
             print(f"Folder '{folder_name}' already exists, overwriting.")
             shutil.rmtree(folder_name)
@@ -58,7 +53,7 @@ def create_folders(n):
         os.makedirs(os.path.join(folder_name, f"backup{i}"), exist_ok=True)
         with open(os.path.join(folder_name, "accessible_paths.txt"), "w") as f:
             f.write(f"backup{i}\n")
-            f.write(f"ss{i}\n")
+            f.write(f"dir{i}\n")
 
 def build_targets():
     try:
