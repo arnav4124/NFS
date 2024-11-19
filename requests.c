@@ -15,6 +15,21 @@ int connectTo(int port, char* ip){
 
     // Create socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);    
+
+
+    struct timeval timeout;      
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
+
+    if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+                sizeof timeout) < 0)
+        perror("setsockopt failed\n");
+
+    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
+                sizeof timeout) < 0);
+    perror("setsockopt failed\n");
+
+
     // Get server information
     server = gethostbyname(ip);
     if (server == NULL) {
@@ -24,7 +39,8 @@ int connectTo(int port, char* ip){
     }
 
     // Set up server address structure
-    bzero((char *)&serv_addr, sizeof(serv_addr));
+    // bzero((char *)&serv_addr, sizeof(serv_addr));
+    memset((char *)&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     memcpy((char *)&serv_addr.sin_addr.s_addr, (char *)server->h_addr_list[0], server->h_length);
     serv_addr.sin_port = htons(port);
@@ -1180,6 +1196,16 @@ void* heartbeat(void* arg)
     while(1){
         sleep(5);
         int sockfd = connectTo(ss->ssPort, ss->ssIP);
+        struct timeval timeout;      
+        timeout.tv_sec = 10;
+        timeout.tv_usec = 0;
+
+        if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+                    sizeof timeout) < 0)
+            perror("setsockopt failed\n");
+
+    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
+                sizeof timeout) < 0);
         if(sockfd < 0){
             pthread_mutex_lock(&ss->mutex);
             printf("Storage server %s:%d is down\n", ss->ssIP, ss->ssPort);

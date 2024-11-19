@@ -39,6 +39,19 @@ servaddr.sin_family = AF_INET;
 servaddr.sin_addr.s_addr = INADDR_ANY;
 servaddr.sin_port = htons(SERVER_PORT);
 setsockopt(sockfdMaster, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+
+struct timeval timeout;      
+timeout.tv_sec = 10;
+timeout.tv_usec = 0;
+
+if (setsockopt (sockfdMaster, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+            sizeof timeout) < 0)
+    perror("setsockopt failed\n");
+
+if (setsockopt (sockfdMaster, SOL_SOCKET, SO_SNDTIMEO, &timeout,
+            sizeof timeout) < 0)
+    perror("setsockopt failed\n");
+
 if (bind(sockfdMaster, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
     perror("Bind failed");
     close(sockfdMaster);
