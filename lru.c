@@ -126,6 +126,7 @@ void removefromLRUBySSID(LRUList **list, const int ssid) {
     LRUNode *prev = NULL;
     while (current != NULL) {
         if (current->ssid == ssid) {
+            // printf("Removing %s from LRU SSid %d\n", current->path,current->ssid);
             if (prev != NULL) {
                 prev->next = current->next;
                 if (current == (*list)->tail) {

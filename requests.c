@@ -1,6 +1,6 @@
 #include "./namingserver.h"
 int getSSIDFromPort(int port){
-    for(int i = 0; i < currentServerCount && storageServersList[i]->status == 1; i++){
+    for(int i = 0; i < currentServerCount; i++){
         if(storageServersList[i]->ssPort == port){
             return i;
         }
@@ -329,7 +329,7 @@ void connectToSS(StorageServer ss, int ssSocket){
         if(storageServersList[i]->ssPort == ss.ssPort){
             ch = i;
             storageServersList[i]->status = 1;
-            if(storageServersList[i]->is_BackedUp)init_redundancy(storageServersList[i]);
+            // if(storageServersList[i]->is_BackedUp) init_redundancy(storageServersList[i]);
             return;
         }
     }
@@ -392,7 +392,7 @@ void connectToSS(StorageServer ss, int ssSocket){
             }
             pthread_mutex_unlock(&storageServersList[i]->mutex);
             pthread_t hb;
-            // pthread_create(&hb, NULL, heartbeat, (void*)storageServersList[i]);
+            pthread_create(&hb, NULL, heartbeat, (void*)storageServersList[i]);
             printf("Received paths from storage server\n");
             break;
         }    
@@ -718,8 +718,6 @@ void handleClientSSRequests(processRequestStruct* req){
     if(req->requestType == READ) snprintf(data, MAX_STRUCT_LENGTH, "%s %d %s", ss->ssIP, ss->clientPort, cr.path);
     else snprintf(data, MAX_STRUCT_LENGTH, "%s %d", ss->ssIP, ss->clientPort);
 
-    printf("Sending IP and Port to client with data %s\n", data);
-
     enqueueLRU(&lruCache, cr.path, checkPathIfPresent);
 
     printf("Sending IP and Port to client\n");
@@ -1000,6 +998,10 @@ void handleCreate(processRequestStruct* req){
         add_path(ss->root, data, checkPathIfPresent);
         ss->numberOfPaths++;
         pthread_mutex_unlock(&ss->mutex);
+        
+
+        enqueueLRU(&lruCache, path, checkPathIfPresent);
+
 
         sendMessageToClient(clientSockets[req->clientID], ACK, "File/Folder created successfully");
 
@@ -1010,16 +1012,7 @@ void handleCreate(processRequestStruct* req){
             backup(ss->clientPort, checkPathIfPresent, data, COPYFOLDER);
         }
     }
-    else if(res.requestType == ACK && (req->requestType == DELETEFILE || req->requestType == DELETEFOLDER)){
-        printf("File/Folder deleted successfully\n");
-        // delete path from the trie
-        pthread_mutex_lock(&ss->mutex);
-        remove_path(ss->root, data);
-        pthread_mutex_unlock(&ss->mutex);
-
-        sendMessageToClient(clientSockets[req->clientID], ACK, "File/Folder deleted successfully");
-    }
-    else if(res.requestType == ERROR){
+    else{
         printf("Error : %s\n", res.data);
         //sending this to client
         sendMessageToClient(clientSockets[req->clientID], ERROR, res.data);
@@ -1188,7 +1181,7 @@ void* heartbeat(void* arg)
             pthread_mutex_lock(&ss->mutex);
             printf("Storage server %s:%d is down\n", ss->ssIP, ss->ssPort);
             ss->status = 0;
-            removefromLRUBySSID(&lruCache,getSSIDFromPort(ss->ssPort));
+            removefromLRUBySSID(&lruCache, getSSIDFromPort(ss->ssPort));
             pthread_mutex_unlock(&ss->mutex);
             close(sockfd);
             return NULL;

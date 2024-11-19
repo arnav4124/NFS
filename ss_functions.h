@@ -15,7 +15,6 @@
 #include <fcntl.h>
 #define MAX_CLIENTS 1000
 
-
 // Function declarations
 void* handle_ns_req(void* arg);
 void* NS_listener(void* arg);

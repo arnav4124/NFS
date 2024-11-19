@@ -88,7 +88,8 @@ void* fts_search( char* arg,int clientSocket,char* dest)
         return NULL;
     }
     char* paths[] = {arg, NULL};
-    file_system = fts_open(paths ,FTS_COMFOLLOW|FTS_NOCHDIR,&compare);
+    file_system = fts_open(paths, FTS_COMFOLLOW|FTS_NOCHDIR,&compare);
+    file_dir pack;
 
     if (NULL != file_system)
     {
@@ -99,7 +100,6 @@ void* fts_search( char* arg,int clientSocket,char* dest)
                 case FTS_D :
                 case FTS_F :
                 case FTS_SL:
-                    file_dir pack;
                     if(node->fts_info==FTS_F)
                     {
                         pack.isFile=1;
