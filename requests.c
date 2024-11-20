@@ -61,6 +61,7 @@ void insertWritePath(writePathNode** writePathsLL, int clientID, char* path, int
     newNode->next = *writePathsLL;
     *writePathsLL = newNode;
     newNode->portNumber = dest_port;
+    printf("Path inserted in writePathsLL\n");
     pthread_mutex_unlock(&writePathsLLMutex);
     return;
 }
@@ -163,7 +164,10 @@ void backup(int port, int ssid, char* dest_path, requestType type){
             //if the path is dest_path, then the path in the backup will be backup/dest_path
             else{
             char data[MAX_STRUCT_LENGTH] = {0};
-            if(type == COPYFOLDER) sprintf(data, "%s %d %s %s", backup1->ssIP, backup1->clientPort, dest_path, backup1->backupFolder);
+            if(type == COPYFOLDER) {
+                sprintf(data, "%s %d %s %s", backup1->ssIP, backup1->clientPort, dest_path, backup1->backupFolder);
+            }
+            
             else{ 
                 char data4[MAX_STRUCT_LENGTH] = {0};
                 //copy everything from dest_path until the last / to data2
@@ -218,7 +222,9 @@ void backup(int port, int ssid, char* dest_path, requestType type){
             }
             
             char data2[MAX_STRUCT_LENGTH] = {0};
-            if(type == COPYFOLDER) sprintf(data2, "%s %d %s %s", backup2->ssIP, backup2->clientPort, dest_path, backup2->backupFolder);
+            if(type == COPYFOLDER) {
+                sprintf(data2, "%s %d %s %s", backup2->ssIP, backup2->clientPort, dest_path, backup2->backupFolder);
+            }
             else {
                 char data3[MAX_STRUCT_LENGTH] = {0};
                 //copy everything from dest_path until the last / to data2
@@ -292,34 +298,6 @@ void sendMessageToClient(int clientSocket, requestType type, char* data){
     return;
 }
 
-void init_redundancy(StorageServer* ss){
-    StorageServer* backup1 = storageServersList[getSSIDFromPort(ss->backupPort1)];
-    // StorageServer* backup2 = storageServersList[getSSIDFromPort(ss->backupPort2)];
-    if(backup1->status)
-    {
-        // search all paths in backup1 which are in ss
-        PathList* paths = initialize_path_list();
-        collect_paths(paths, ss->root);
-        // send all paths to backup1
-        PathNode* temp = paths->head;
-        while(temp != NULL){
-            if(strstr(temp->path, ".wav") != NULL){
-                //dont backup audio files
-                temp = temp->next;
-                continue;   
-            }
-            if(strstr(temp->path, ".") != NULL){
-                printf("Backing up file %s\n", temp->path);
-                backup(backup1->clientPort, getSSIDFromPort(backup1->ssPort), temp->path, COPYFILE);
-            }
-            else{
-                printf("Backing up folder %s\n", temp->path);
-                backup(backup1->clientPort, getSSIDFromPort(backup1->ssPort), temp->path, COPYFOLDER);
-            }
-            temp = temp->next;
-        }
-    }
-}
 void connectToSS(StorageServer ss, int ssSocket){
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
@@ -396,7 +374,7 @@ void connectToSS(StorageServer ss, int ssSocket){
             }
             pthread_mutex_unlock(&storageServersList[i]->mutex);
             pthread_t hb;
-            // pthread_create(&hb, NULL, heartbeat, (void*)storageServersList[i]);
+            pthread_create(&hb, NULL, heartbeat, (void*)storageServersList[i]);
             printf("Received paths from storage server\n");
             break;
         }    
@@ -510,6 +488,7 @@ void handleCopyingFolders(processRequestStruct* req){
     strcpy(path_source, token);
     token = strtok(NULL, " ");
     strcpy(path_dest, token);
+
     int ssid1 = retrievePathIndex(path_source);
     int ssid2 = retrievePathIndex(path_dest);
     if(ssid1 == -1 || ssid2 == -1){
@@ -1184,6 +1163,8 @@ void* heartbeat(void* arg)
             printf("Storage server %s:%d is down\n", ss->ssIP, ss->ssPort);
             ss->status = 0;
             removefromLRUBySSID(&lruCache, getSSIDFromPort(ss->ssPort));
+
+            
             pthread_mutex_unlock(&ss->mutex);
             close(sockfd);
             return NULL;

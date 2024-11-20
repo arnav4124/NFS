@@ -7,7 +7,7 @@ def generate_makefile(n):
     makefile_content = """
 # compile the program  
 # Compiler
-CC = clang
+CC = gcc
 
 # Compiler flags
 CFLAGS = -Wall -g 

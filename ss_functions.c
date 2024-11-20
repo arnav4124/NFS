@@ -80,6 +80,7 @@ void* fts_search( char* arg,int clientSocket,char* dest)
     request pack1;
     pack1.requestType=PASTEFOLDER;
     strcpy(pack1.data,dest);
+    printf("Dest is %s\n", dest);
     char buffer[sizeof(request)];
     memset(buffer, 0, sizeof(request));
     memcpy(buffer, &pack1, sizeof(request));
@@ -111,6 +112,7 @@ void* fts_search( char* arg,int clientSocket,char* dest)
                     }
                     strcpy(pack.path,node->fts_path);
                     strcpy(pack.name,node->fts_name);
+                     printf("Fts Path: %s\n", pack.path);   
                     // if file path has .wav then break
                     if(strstr(node->fts_name, ".wav") != NULL){
                         break;
@@ -1094,6 +1096,8 @@ void* handle_client_req(void* arg)
         int c;
         while((c = recv(clientSocket, buff2, sizeof(file_dir), 0)) > 0){
             memcpy(&pack, buff2, sizeof(buff2));
+            int fl=0;
+            char fname[MAX_PATH_LENGTH] = {0};
             if (cnt==0)
             {
                 strcpy(src,pack.path);
@@ -1136,10 +1140,13 @@ void* handle_client_req(void* arg)
                 printf("Folder name: %s\n", filename);
                 if(mkdir(filename, 0777) < 0){
                     if(errno==EEXIST){
-                        printf("Folder already exists");
-                        send_err_to_ns(clientSocket,"Folder already exists");
-                        close(clientSocket);
-                        return NULL;
+                        printf("\nFolder already exists");
+                        // send_err_to_ns(clientSocket,"Folder already exists");
+                        rmdir(filename);
+                        mkdir(filename, 0777);
+                        send_path_to_ns(req.data, pack.path,0);
+                        // close(clientSocket);
+                        // return NULL;
                     }
                     // printf("Folder creation failed");
                     else if(errno==EACCES){
@@ -1157,6 +1164,11 @@ void* handle_client_req(void* arg)
                    
                     return NULL;
                 }
+                // if(fl){
+                //     printf("Folder already ghanta\n");
+                //     rmdir(fname);
+                //     mkdir(fname, 0777);
+                // }
                 else send_path_to_ns(req.data, pack.path,0);
             }
             memset(&pack, 0, sizeof(request));
